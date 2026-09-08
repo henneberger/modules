@@ -341,6 +341,10 @@ def resolve_assembly(
                 for ref in [card["provides"], *card.get("requires", {}).values()]:
                     key = (ref["id"], ref["version"])
                     interfaces[key] = validate_interface(repository.interface(*key))
+                from .associated import validate_against_interface
+
+                provided = card["provides"]
+                validate_against_interface(card, interfaces[(provided["id"], provided["version"])])
             for alias in document["assembly"].get("type_libraries", []):
                 ref = cards[alias]["provides"]
                 if not interfaces[(ref["id"], ref["version"])]["types"]:
@@ -541,6 +545,7 @@ def _verify_assembly(lock: dict, repository=None) -> dict:
     if used != set(lock["bindings"]):
         raise AssemblyError("locked binding set differs from the module expression")
     signatures = {}
+    interface_specs = {}
     for spec in lock["interfaces"]:
         normalized = validate_interface(spec)
         key = (normalized["id"], normalized["version"])
@@ -552,6 +557,7 @@ def _verify_assembly(lock: dict, repository=None) -> dict:
         ):
             raise AssemblyError(f"repository interface differs from lock: {key}")
         signatures[key] = signature_from_spec(normalized)
+        interface_specs[key] = normalized
     cards = {}
     references = set()
     for alias, binding in lock["bindings"].items():
@@ -571,6 +577,13 @@ def _verify_assembly(lock: dict, repository=None) -> dict:
             references.add(key)
             if key not in signatures:
                 raise AssemblyError(f"locked interface is missing: {ref}")
+        from .associated import validate_against_interface
+
+        provided = cards[alias]["provides"]
+        try:
+            validate_against_interface(cards[alias], interface_specs[(provided["id"], provided["version"])])
+        except ValueError as error:
+            raise AssemblyError(f"{alias}: {error}") from error
     if set(signatures) != references:
         raise AssemblyError("locked interfaces differ from the selected contracts")
     for alias in libraries:
@@ -685,7 +698,7 @@ def instantiate(lock: dict, repository, target: str | Path) -> AssemblyInstance:
             checked["signatures"],
             types=fixed,
         )
-        return module.signature.seal(module, identity=f"assembly:{lock['sha256']}", indices=module.metadata()["indices"])
+        return module.signature.seal(module, identity=f"assembly:{lock['sha256']}", indices=module.metadata()["indices"], associated=module.metadata()["associated"])
 
     bundle = atomic_import(repository, lock["bindings"], target, link=link)
     return AssemblyInstance(bundle.value, bundle, lock["sha256"])

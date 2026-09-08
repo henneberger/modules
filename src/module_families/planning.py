@@ -13,6 +13,7 @@ import math
 import re
 from typing import Any
 
+from .associated import resolve_metadata, validate_associated
 from .indices import resolve_indices, validate_indices
 
 
@@ -108,6 +109,7 @@ def _cards(candidates: Any) -> dict[str, dict]:
             _text(identity, f"{alias}.type_exports.{name}")
         card["type_exports"] = type_exports
         validate_indices(card)
+        validate_associated(card)
         result[alias] = card
     try:
         _canonical(result)
@@ -233,6 +235,10 @@ def _check(
         indices = resolve_indices(card, {slot: child["indices"] for slot, child in children.items()})
     except ValueError as error:
         raise _Rejected("semantic-index-mismatch", path, alias, reason=str(error)) from error
+    try:
+        associated = resolve_metadata(card, {slot: child["associated"] for slot, child in children.items()})
+    except ValueError as error:
+        raise _Rejected("associated-type-mismatch", path, alias, reason=str(error)) from error
     for left, right in card.get("sharing", []):
         left_slot, left_type = left.split(".")
         right_slot, right_type = right.split(".")
@@ -282,6 +288,7 @@ def _check(
         "effects": sorted(effects),
         "type_exports": card["type_exports"],
         "indices": indices,
+        "associated": associated,
         "residual_obligations": residuals,
         "selected": selected,
     }
@@ -369,6 +376,7 @@ def plan(
                 "effects": checked["effects"],
                 "type_exports": copy.deepcopy(checked["type_exports"]),
                 "indices": copy.deepcopy(checked["indices"]),
+                "associated": copy.deepcopy(checked["associated"]),
                 "residual_obligations": [residuals[key] for key in sorted(residuals)],
                 "selected": [
                     {

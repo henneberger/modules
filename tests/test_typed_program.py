@@ -312,3 +312,11 @@ def test_typed_build_bytes_do_not_depend_on_output_directory(tmp_path):
     a = json.loads(Path(first["index"]).read_text())
     b = json.loads(Path(second["index"]).read_text())
     assert a["members"][0]["sha256"] == b["members"][0]["sha256"]
+
+
+def test_associated_value_body_requires_explicit_language_extension(tmp_path):
+    output = contract(effects=[])
+    output["associated"] = {"types": {"Space": "identity"}}
+    repository, manifest = prepare(tmp_path, 'return "ok"', output=output)
+    with pytest.raises(TypeCheckError, match="module graph linker"):
+        check_program(manifest, repository)

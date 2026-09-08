@@ -119,6 +119,10 @@ def _resolved_types(spec):
         raise TypeCheckError(
             f"interface {spec['id']}@{spec['version']} has no typed contract"
         )
+    if spec.get("associated", {}).get("types") or any("term" in value for value in typing["types"].values()):
+        raise TypeCheckError(
+            "associated value terms currently require the module graph linker; .mfl substitution is not implemented"
+        )
     return typing["types"]
 
 

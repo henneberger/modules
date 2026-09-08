@@ -1,6 +1,6 @@
 # A module calculus for independent contributions
 
-This is the design for the next type-system increment, not a description of syntax already accepted by the compiler. The executable baseline is [the checked language](checked-language.md) and [open TOML module graphs](module-build.md). The contribution workflow can distribute and evaluate work against those existing contracts while the richer calculus is implemented.
+This document specifies the broader module calculus. Version 0.6.0 implements its first-order associated declarations, kinded terms, and substitution through module graphs; the [associated-type guide](associated-types.md) defines the executable TOML syntax. The richer notation below, generic `.mfl` bodies, and inferred/generative identity semantics remain design work. The executable baseline is [the checked language](checked-language.md) and [open TOML module graphs](module-build.md). The contribution workflow can distribute and evaluate work against those existing contracts while the richer calculus is implemented.
 
 The objective is to check a contribution using only the assumptions it needs, then preserve that check when another agent supplies those assumptions. A retrieval developer should not need to inspect every encoder, index, document store, and citation renderer that might eventually be selected.
 
@@ -18,7 +18,7 @@ Separate checking above an existing implementation language follows the architec
 | Implementation confidence | Checked orchestration plus trusted Python | Independently recorded conformance evidence; still a trusted boundary |
 | Initialization | Fixed topological Python wiring | Keep this discipline; recursive initialization is a separate problem |
 
-Semantic indices already reject a declared mismatch between an encoder's `Space` and an index's `Space`. They are strings, however: the checked value language cannot yet express `Vector[Embedding.Space]`. Exported Python classes are another distinct mechanism. The next checker must connect value types to module relationships instead of treating these as parallel metadata systems.
+Semantic indices already reject a declared mismatch between an encoder's `Space` and an index's `Space`. They are strings, however: the checked value language cannot yet express `Vector[Embedding.Space]`. Exported Python classes are another distinct mechanism. The 0.6.0 graph checker now connects associated witnesses to value types in typed export projections. Extending the `.mfl` operation checker with those substitutions remains the next step.
 
 ## A knowledge-base example
 

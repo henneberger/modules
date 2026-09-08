@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 
+from .associated import resolve_metadata, validate_against_interface
 from .contracts import Functor, Requirement
 from .indices import resolve_indices
 from .interfaces import signature_from_spec
@@ -26,14 +27,26 @@ def prepare_graph(spec, raw, ports):
     def signature(ref):
         return signatures[(ref["id"], ref["version"])]
 
+    declarations = {(s["id"], s["version"]): s for s in spec["interfaces"]}
     doc = spec["document"]
     if set(ports) != set(doc["ports"]):
         raise ModuleLinkError("unfilled or extra open module ports")
     for name, module in ports.items():
         Requirement(signature(doc["ports"][name]["requires"])).check(module, name)
+        ref = doc["ports"][name]["requires"]
+        validate_against_interface({"associated": module.metadata()["associated"]}, declarations[(ref["id"], ref["version"])])
     resolve_indices(
         spec, {name: module.metadata()["indices"] for name, module in ports.items()}
     )
+    witnesses = {name: module.metadata()["associated"] for name, module in ports.items()}
+    resolve_metadata({"requires": doc["ports"], "associated": spec.get("associated", {})}, witnesses)
+    for alias in spec["order"]:
+        card = spec["cards"][alias]
+        witnesses[alias] = resolve_metadata(card, {
+            slot: witnesses[doc["links"][alias + "." + slot]] for slot in card.get("requires", {})
+        })
+        ref = card["provides"]
+        validate_against_interface({"associated": witnesses[alias]}, declarations[(ref["id"], ref["version"])])
     prepared = {}
 
     def factory_invoker(functor, card):
@@ -47,7 +60,7 @@ def prepare_graph(spec, raw, ports):
             )
             module = functor(**arguments)
             return module.signature.seal(
-                module, identity=module.identity, indices=indices
+                module, identity=module.identity, indices=indices, associated=module.metadata()["associated"]
             )
 
         return invoke
@@ -83,6 +96,7 @@ def prepare_graph(spec, raw, ports):
                 result,
                 raw[alias],
                 sharing=card.get("sharing", ()),
+                associated=card.get("associated", {}),
             )
 
             invoke = factory_invoker(functor, card)
@@ -99,6 +113,7 @@ def prepare_graph(spec, raw, ports):
                 exports,
                 identity=f"artifact:{card['sha256']}",
                 indices=resolve_indices(card, {}),
+                associated=resolve_metadata(card, {}),
             )
 
             invoke = raw_invoker(module)
@@ -133,6 +148,10 @@ def finish_graph(spec, nodes):
             for name, path in doc["exports"].items()
         },
         identity="graph:" + hashlib.sha256(canonical_bytes(spec)).hexdigest(),
+        associated=resolve_metadata(
+            {"requires": doc["ports"], "associated": spec.get("associated", {})},
+            {name: nodes[name].metadata()["associated"] for name in doc["ports"]},
+        ),
         indices=resolve_indices(
             spec, {name: nodes[name].metadata()["indices"] for name in doc["ports"]}
         ),

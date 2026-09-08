@@ -10,6 +10,7 @@ import an implementation, or prove returned values and behavioral laws.
 from __future__ import annotations
 
 import inspect
+import json
 import keyword
 from typing import Any
 
@@ -64,7 +65,7 @@ def validate_interface_reference(reference: Any) -> dict[str, str]:
 
 
 def _interpret(spec: Any) -> Signature:
-    spec = _shape(spec, {"id", "version", "callables", "types", "typing"}, "interface")
+    spec = _shape(spec, {"id", "version", "callables", "types", "typing", "associated"}, "interface")
     reference = validate_interface_reference(
         {key: spec.get(key) for key in ("id", "version")}
     )
@@ -137,8 +138,62 @@ def _interpret(spec: Any) -> Signature:
         raise InterfaceError(str(error)) from error
 
 
-def _typing(spec: dict, signature: Signature) -> dict:
+def _associated(spec: Any) -> dict:
+    """Validate abstract type parameters and first-order type constructors."""
+    spec = _shape(spec, {"types", "constructors"}, "interface associated")
+    kinds = {"identity", "shared", "affine", "linear"}
+    types = spec.get("types", {})
+    constructors = spec.get("constructors", {})
+    if not isinstance(types, dict) or not isinstance(constructors, dict):
+        raise InterfaceError("associated types and constructors must be objects")
+    for name, kind in types.items():
+        _name(name, "associated type")
+        if not isinstance(kind, str) or kind not in kinds:
+            raise InterfaceError(f"associated type {name} has invalid kind")
+    normalized = {}
+    for name, declaration in constructors.items():
+        if not isinstance(name, str) or not name or name != name.strip():
+            raise InterfaceError("associated constructor must have a nonempty trimmed name")
+        declaration = _shape(declaration, {"parameters", "result"}, f"constructor {name}")
+        parameters = declaration.get("parameters")
+        result = declaration.get("result")
+        if not isinstance(parameters, list) or any(
+            not isinstance(kind, str) or kind not in kinds for kind in parameters
+        ):
+            raise InterfaceError(f"constructor {name} parameters must list kinds")
+        if not isinstance(result, str) or result not in kinds:
+            raise InterfaceError(f"constructor {name} result must be a kind")
+        normalized[name] = {"parameters": list(parameters), "result": result}
+    return {"types": dict(sorted(types.items())), "constructors": dict(sorted(normalized.items()))}
+
+
+def _local_term(term: Any, associated: dict) -> dict:
+    from .type_terms import normalize_term
+
+    try:
+        normalized = normalize_term(term, constructors=associated["constructors"])
+    except ValueError as error:
+        raise InterfaceError(str(error)) from error
+
+    def check(value):
+        if "from" in value:
+            raise InterfaceError("interface type terms cannot reference dependency slots")
+        if "var" in value:
+            name = value["var"]
+            if name not in associated["types"]:
+                raise InterfaceError(f"undeclared associated type variable {name}")
+            if value["kind"] != associated["types"][name]:
+                raise InterfaceError(f"associated type variable {name} has inconsistent kind")
+        for argument in value.get("args", []):
+            check(argument)
+
+    check(normalized)
+    return normalized
+
+
+def _typing(spec: dict, signature: Signature, associated: dict | None = None) -> dict:
     """Validate the first-order typed language without importing Python code."""
+    associated = associated or {"types": {}, "constructors": {}}
     declaration = _shape(spec, {"types", "operations"}, "interface typing")
     types = declaration.get("types")
     operations = declaration.get("operations")
@@ -148,10 +203,16 @@ def _typing(spec: dict, signature: Signature) -> dict:
     for name in types:
         _name(name, "typed local type")
     for name, value in sorted(types.items()):
-        value = _shape(value, {"id", "usage", "representation"}, f"typing.types.{name}")
-        identity = value.get("id")
-        if not isinstance(identity, str) or not identity or identity != identity.strip():
-            raise InterfaceError(f"typed type {name}.id must be a nonempty trimmed string")
+        value = _shape(value, {"id", "term", "usage", "representation"}, f"typing.types.{name}")
+        if ("id" in value) == ("term" in value):
+            raise InterfaceError(f"typed type {name} requires exactly one of id or term")
+        if "id" in value:
+            identity = value["id"]
+            if not isinstance(identity, str) or not identity or identity != identity.strip():
+                raise InterfaceError(f"typed type {name}.id must be a nonempty trimmed string")
+            identity_fields = {"id": identity}
+        else:
+            identity_fields = {"term": _local_term(value["term"], associated)}
         usage = value.get("usage")
         representation = value.get("representation")
         if not isinstance(usage, str) or usage not in {"shared", "affine", "linear"}:
@@ -160,12 +221,19 @@ def _typing(spec: dict, signature: Signature) -> dict:
             "opaque", "str", "int", "float", "bool", "bytes"
         }:
             raise InterfaceError(f"typed type {name}.representation is unsupported")
+        if "term" in identity_fields and identity_fields["term"]["kind"] != usage:
+            raise InterfaceError(f"typed type {name} term kind must equal its value usage")
         normalized_types[name] = {
-            "id": identity, "usage": usage, "representation": representation
+            **identity_fields, "usage": usage, "representation": representation
         }
     identities = {}
     for value in normalized_types.values():
-        identity = value["id"]
+        # A nominal term and the legacy spelling of that same nominal identity
+        # denote one type; constructor applications remain structurally distinct.
+        term = value.get("term", {"nominal": value.get("id"), "kind": value["usage"]})
+        identity = json.dumps(term, sort_keys=True, separators=(",", ":"))
+        if "nominal" in term:
+            identity = "nominal:" + term["nominal"]
         properties = (value["usage"], value["representation"])
         if identity in identities and identities[identity] != properties:
             raise InterfaceError(f"typed identity {identity} has inconsistent declarations")
@@ -230,8 +298,11 @@ def validate_interface(spec: dict) -> dict:
     """
     signature = _interpret(spec)
     result = signature.metadata()
+    associated = _associated(spec["associated"]) if "associated" in spec else None
+    if associated is not None:
+        result["associated"] = associated
     if "typing" in spec:
-        result["typing"] = _typing(spec["typing"], signature)
+        result["typing"] = _typing(spec["typing"], signature, associated)
     return result
 
 
@@ -242,8 +313,9 @@ def signature_from_spec(spec: dict) -> Signature:
     compiler; the runtime Signature itself does not enforce ownership or effects.
     """
     signature = _interpret(spec)
+    associated = _associated(spec["associated"]) if "associated" in spec else None
     if "typing" in spec:
-        _typing(spec["typing"], signature)
+        _typing(spec["typing"], signature, associated)
     return signature
 
 

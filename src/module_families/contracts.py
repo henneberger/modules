@@ -6,6 +6,7 @@ prove behavioral substitution or restrict execution of arbitrary Python code.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import inspect
 import json
@@ -289,6 +290,7 @@ class Signature:
         provides: Mapping[str, str] | None = None,
         identity: str | None = None,
         indices: Mapping[str, str] | None = None,
+        associated: Mapping[str, Any] | None = None,
     ) -> ModuleView:
         """Validate exports and expose only declared names through a read-only view.
 
@@ -307,15 +309,15 @@ class Signature:
                 )
         if identity is None:
             identity = f"local:{uuid4().hex}"
-        return ModuleView(exports, self, identity, indices=indices)
+        return ModuleView(exports, self, identity, indices=indices, associated=associated)
 
 
 class ModuleView(Mapping[str, Any]):
     """A read-only export projection, not a sandbox or a deep freeze."""
 
-    __slots__ = ("_exports", "_signature", "_identity", "_instance_id", "_indices")
+    __slots__ = ("_exports", "_signature", "_identity", "_instance_id", "_indices", "_associated")
 
-    def __init__(self, exports: Mapping[str, Any], signature: Signature, identity: str, *, indices=None):
+    def __init__(self, exports: Mapping[str, Any], signature: Signature, identity: str, *, indices=None, associated=None):
         # Public construction checks too, so callers cannot accidentally bypass
         # conformance by skipping Signature.seal(). Requirement rechecks on bind.
         if not isinstance(signature, Signature):
@@ -335,6 +337,13 @@ class ModuleView(Mapping[str, Any]):
         )):
             raise ContractError("indices must map identifiers to nonempty identities")
         object.__setattr__(self, "_indices", MappingProxyType(dict(indices or {})))
+        from .associated import resolve_metadata
+
+        try:
+            metadata = resolve_metadata({"associated": copy.deepcopy(dict(associated or {}))}, {})
+        except ValueError as error:
+            raise ContractError(str(error)) from error
+        object.__setattr__(self, "_associated", metadata)
 
     def __setattr__(self, name: str, value: Any) -> None:
         raise AttributeError("module views are read-only")
@@ -379,6 +388,7 @@ class ModuleView(Mapping[str, Any]):
             "identity": self.identity,
             "instance_id": self.instance_id,
             "indices": dict(self._indices),
+            "associated": copy.deepcopy(self._associated),
         }
 
 
@@ -441,6 +451,7 @@ class Functor:
     result: Signature
     factory: Callable[..., Mapping[str, Any]]
     sharing: tuple[tuple[str, str], ...] = ()
+    associated: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _text(self.name, "factory name")
@@ -486,6 +497,11 @@ class Functor:
             sharing.append(tuple(pair))
         object.__setattr__(self, "parameters", MappingProxyType(parameters))
         object.__setattr__(self, "sharing", tuple(sharing))
+        from .associated import validate_associated
+
+        declaration = copy.deepcopy(dict(self.associated))
+        validate_associated({"requires": dict(parameters), "associated": declaration})
+        object.__setattr__(self, "associated", declaration)
 
     def metadata(self) -> dict[str, Any]:
         return {
@@ -496,6 +512,7 @@ class Functor:
             },
             "result": self.result.reference(),
             "sharing": [list(pair) for pair in self.sharing],
+            "associated": copy.deepcopy(self.associated),
         }
 
     def __call__(self, **bindings: ModuleView) -> ModuleView:
@@ -514,6 +531,15 @@ class Functor:
                 raise ContractError(
                     f"type sharing conflict: {left} and {right} are different Python types"
                 )
+        from .associated import resolve_metadata
+
+        try:
+            associated = resolve_metadata(
+                {"requires": dict(self.parameters), "associated": self.associated},
+                {slot: module.metadata()["associated"] for slot, module in bindings.items()},
+            )
+        except ValueError as error:
+            raise ContractError(str(error)) from error
         identity_payload = {
             "factory": self.metadata(),
             "bindings": {
@@ -525,7 +551,7 @@ class Functor:
         ).encode("utf-8")
         identity = "binding:" + hashlib.sha256(encoded).hexdigest()
         exports = self.factory(**bindings)
-        return self.result.seal(exports, identity=identity)
+        return self.result.seal(exports, identity=identity, associated=associated)
 
 
 __all__ = [

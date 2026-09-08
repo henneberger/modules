@@ -6,6 +6,8 @@ In 0.4.0, graph exports with typed interfaces must also preserve parameter owner
 
 This implements **nonrecursive mixin linking through explicit module ports**: partial composition, reuse of partially linked modules, export merging through explicit projection, renaming, and binding operations to selected dependency modules. Recursive linking and automatic rebinding of ordinary Python globals are not supported.
 
+In 0.6.0, [associated types](associated-types.md) add kinded witnesses, constructor applications, and residual equations. Graphs use `[associated.types]` and `constraints.same_associated`; open obligations survive publication, nested closure, synthesis, and locked execution. Typed exports substitute module witnesses before comparing their value types.
+
 ## Author a graph in TOML
 
 See the executable [open Mari retrieval graph](../examples/modules/retrieval.toml) and [complete knowledge graph](../examples/modules/knowledge.toml). This small graph demonstrates the grammar:

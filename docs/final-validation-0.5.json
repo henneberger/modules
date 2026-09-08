@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-08",
+  "version": "0.5.0",
+  "python": "3.14.6",
+  "repository_schema": 3,
+  "tests": {
+    "passed": 466,
+    "subtests_passed": 32,
+    "seconds": 19.64,
+    "command": ".venv/bin/pytest -q --tb=short"
+  },
+  "ruff": "passed: src tests scripts examples adaptations/knowledge adaptations/transactions",
+  "contribution_loop": {
+    "report": "contribution-validation.json",
+    "command": ".venv/bin/python examples/contribution_system.py --work-dir .mf/contribution-release --wheelhouse .mf/contribution-wheels",
+    "initial_status": "needs-contributions",
+    "candidate_statuses": {
+      "miswired": "failed",
+      "integrator": "passed"
+    },
+    "final_status": "resolved",
+    "program_sha256": "b3bc50466721ac58c95d879162634d7f854757fe459242034fc91b9a0d4362dd",
+    "offline_result": [
+      [
+        {
+          "id": "guide:1",
+          "text": "modules",
+          "relevance": 1.0
+        }
+      ]
+    ]
+  },
+  "release_wheel": {
+    "path": "dist/module-families/module_families-0.5.0-py3-none-any.whl",
+    "sha256": "286c063ddc1944eb9951bc5715cfa19ef58380ed98a96119da487c191534bf36",
+    "built": true
+  },
+  "previous_measurements": {
+    "report": "final-validation-0.4.json",
+    "note": "Historical typed SQLite and preceding knowledge/scale experiments retained; the knowledge contribution loop is the new real integration measurement."
+  },
+  "limits": [
+    "Evidence is unsigned local observation; hashes establish consistency, not evaluator authentication.",
+    "Private Python environments are not security sandboxes.",
+    "Acceptance is an explicit workflow, not repository-wide mandatory admission policy.",
+    "Exact JSON cases are observations, not behavioral proofs; capabilities and Python effect declarations remain trusted.",
+    "Handoffs include only missing interfaces reached by bounded search; acceptance cases must be authored.",
+    "Associated/abstract type calculus is documented design, not executable new language support.",
+    "No autonomous scheduler or multi-agent throughput experiment is included."
+  ]
+}

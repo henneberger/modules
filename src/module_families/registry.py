@@ -399,10 +399,12 @@ def _validate_index(index: dict[str, Any]) -> dict[str, Any]:
                 validate_interface_reference(member["provides"])
             except ValueError as exc:
                 raise RegistryError(f"Invalid provides reference: {exc}") from exc
+        from .associated import validate_associated
         from .indices import validate_indices
 
         try:
             validate_indices(member)
+            validate_associated(member)
         except ValueError as exc:
             raise RegistryError(f"Invalid semantic indices: {exc}") from exc
         _text(member.get("version", family["version"]), "member.version")

@@ -15,6 +15,7 @@ from pathlib import Path
 from packaging.version import Version
 
 from .assemblies import _check, _policy
+from .associated import validate_against_interface
 from .interfaces import validate_interface, validate_interface_reference
 from .planning import _cards, _is_open
 from .registry import canonical_bytes
@@ -301,6 +302,9 @@ def synthesize(
                 selected.add(key)
                 if key not in interfaces:
                     interfaces[key] = validate_interface(repository.interface(*key))
+        for card in cards.values():
+            ref = card["provides"]
+            validate_against_interface(card, interfaces[(ref["id"], ref["version"])])
         return [interfaces[key] for key in sorted(selected)]
 
     def artifact_count(cards):

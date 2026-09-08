@@ -267,6 +267,29 @@ The real example adapts more-itertools and boltons. Publishing another provider 
 
 This is bounded constructor synthesis, not arbitrary algorithm invention. Graph builds select providers for authored topology; synthesis can nest published constructors. Capability labels guide selection but do not prove behavioral laws; aggregating a dependency's labels does not prove that its parent exposes the claimed behavior. Multiple valid compositions remain an explicit choice; search limits remain visible. See [synthesis semantics](docs/synthesis.md).
 
+## Associate types with the modules that define them
+
+Version 0.6.0 makes associated types and substitution executable in the graph builder. An embedding signature can declare an abstract `Space`; a provider supplies its concrete witness; a cache exports `base.Space`. A typed vector result can then be described as `VectorBatch[Space]`, rather than an unrelated array type.
+
+An open module can require `query.Space = index.Space` without selecting either provider. Its published constructor carries that equation forward. When another graph supplies providers, substitution checks their witnesses and rejects distinct spaces—even if their arrays have identical dimensions. The same mechanism connects a retriever's document IDs to its data store's domain.
+
+```toml
+# Fragment of an open graph; paths refer to its declared nodes or ports.
+[associated.types]
+Space = { from = "embedding.Space", kind = "identity" }
+
+[constraints]
+same_associated = [["query.Space", "index.Space"]]
+```
+
+The [associated-type guide](docs/associated-types.md) explains the term language, typed projection checks, and residual equations. The real example reuses the knowledge-system providers:
+
+```bash
+.venv/bin/python examples/associated_system.py --work-dir .mf/associated
+```
+
+Run it after installing the project below. This increment checks associated types at graph boundaries. Substitution inside `.mfl` operation bodies and generated fresh type identities are subsequent language work.
+
 ## Close the contribution loop
 
 Version 0.5.0 makes a first part of the coordination model executable. A missing provider becomes a contribution draft; an integrator adds acceptance cases; a contributor builds a candidate in a staging repository; evaluation binds observations to the exact program and environment; an explicit acceptance command publishes the tested contribution.
@@ -432,11 +455,11 @@ The project draws on ML signatures, functors, abstract types, and sharing; modul
 
 The research direction is a software ecosystem where an agent can begin with a desired system, find its missing contracts, delegate those contracts to other agents, and assemble the resulting contributions. Richer module types, reusable protocols, evaluation-backed selection, and distributed publication are the foundations for that ecosystem.
 
-Version 0.5.0 implements the build and repository core, nonrecursive open module composition, bounded constructor synthesis, a restricted typed language, and executable contribution contracts with local evaluation and explicit acceptance. Million-agent coordination is the target architecture; the current repository is single-node and does not provide agent scheduling or federation. Python providers remain trusted. Full generative module typing, arbitrary program synthesis, and automatic lifecycle reasoning remain research work.
+Version 0.6.0 implements the build and repository core, nonrecursive open module composition with associated-type substitution, bounded constructor synthesis, a restricted typed language, and executable contribution contracts with local evaluation and explicit acceptance. Million-agent coordination is the target architecture; the current repository is single-node and does not provide agent scheduling or federation. Python providers remain trusted. Full generative module typing, arbitrary program synthesis, and automatic lifecycle reasoning remain research work.
 
 Local scale measurements include 10,000 definitions across 1,000 contribution files with a 21-line root TOML, and a copied Mari workload with 988 public definitions. These measure compact authoring and selective builds, rather than concurrent agent capacity.
 
-The 0.5.0 validation records **466 tests and 32 subtests passing**, plus lint, wheel construction, and the knowledge-base contribution loop. The 0.4.0 report retains the SQLite publication-to-offline-execution evidence. Historical reports cover the composed knowledge system, copied Mari migration, and local source-scale workloads. These are separate measurements with their scopes recorded in [validation](docs/VALIDATION.md).
+The 0.6.0 validation records **567 tests and 32 subtests passing**, plus lint, wheel construction, and the associated-type knowledge-system example. Historical 0.5.0 and 0.4.0 reports retain the contribution-loop and SQLite evidence. Historical reports cover the composed knowledge system, copied Mari migration, and local source-scale workloads. These are separate measurements with their scopes recorded in [validation](docs/VALIDATION.md).
 
 ```bash
 .venv/bin/pytest -q
@@ -453,7 +476,8 @@ The 0.5.0 validation records **466 tests and 32 subtests passing**, plus lint, w
 | [Module graph guide](docs/module-build.md) | Open modules, mixins, sharing constraints, generated wiring, and limits. |
 | [Checked-language guide](docs/checked-language.md) | Grammar, nominal types, resource rules, effects, and the trusted Python boundary. |
 | [Contribution workflow](docs/contributions.md) | Missing requirements, task contracts, evaluation, and accepted publication. |
-| [Module calculus design](docs/module-calculus.md) | Proposed associated types, sharing rules, and implementation milestones. |
+| [Associated-type guide](docs/associated-types.md) | Executable type terms, graph substitution, and published sharing obligations. |
+| [Module calculus design](docs/module-calculus.md) | Broader calculus, remaining language features, and implementation milestones. |
 | [Synthesis guide](docs/synthesis.md) | Constructor search, ambiguity, policies, and program locks. |
 | [Repository guide](docs/repository.md) | Publication, authentication, and artifact retrieval. |
 

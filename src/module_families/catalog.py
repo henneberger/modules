@@ -67,10 +67,12 @@ def _symbol(value: Any, identifier: str, packages: list[str]) -> None:
 
 
 def _references(member: dict, identifier: str) -> None:
+    from .associated import validate_associated
     from .indices import validate_indices
 
     try:
         validate_indices(member)
+        validate_associated(member)
     except ValueError as error:
         raise ManifestError(f"{identifier}: {error}") from error
     try:

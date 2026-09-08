@@ -1,51 +1,58 @@
 {
   "date": "2026-09-08",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "python": "3.14.6",
   "repository_schema": 3,
   "tests": {
-    "passed": 466,
+    "passed": 567,
     "subtests_passed": 32,
-    "seconds": 19.64,
+    "seconds": 20.7,
     "command": ".venv/bin/pytest -q --tb=short"
   },
-  "ruff": "passed: src tests scripts examples adaptations/knowledge adaptations/transactions",
-  "contribution_loop": {
-    "report": "contribution-validation.json",
-    "command": ".venv/bin/python examples/contribution_system.py --work-dir .mf/contribution-release --wheelhouse .mf/contribution-wheels",
-    "initial_status": "needs-contributions",
-    "candidate_statuses": {
-      "miswired": "failed",
-      "integrator": "passed"
-    },
-    "final_status": "resolved",
-    "program_sha256": "b3bc50466721ac58c95d879162634d7f854757fe459242034fc91b9a0d4362dd",
-    "offline_result": [
-      [
-        {
-          "id": "guide:1",
-          "text": "modules",
-          "relevance": 1.0
-        }
-      ]
-    ]
+  "ruff": "passed: src tests scripts examples adaptations/associated adaptations/knowledge adaptations/transactions",
+  "associated_types": {
+    "kinded_first_order_terms": true,
+    "interface_local_variables": true,
+    "provider_witnesses": true,
+    "graph_substitution": true,
+    "residual_open_equations": true,
+    "nested_publication": true,
+    "typed_export_projection": true,
+    "synthesis_and_lock_checks": true,
+    "runtime_preflight": true,
+    "generic_mfl_bodies": false,
+    "inferred_applicative_identity": false,
+    "generativity": false
+  },
+  "real_candidate": {
+    "report": "associated-types-validation.json",
+    "command": ".venv/bin/python examples/associated_system.py --work-dir .mf/associated-release --wheelhouse .mf/contribution-wheels",
+    "synthesis_status": "unique",
+    "program_sha256": "4a285044123ea9800ef77a4fa3a7afa4117ac7c7486cffdc164e658a7cf8dcfb",
+    "first_hits": [
+      "dogs",
+      "python"
+    ],
+    "rejected": [
+      "vector_space",
+      "document_identity"
+    ],
+    "copied_mari_source_unchanged": true
   },
   "release_wheel": {
-    "path": "dist/module-families/module_families-0.5.0-py3-none-any.whl",
-    "sha256": "286c063ddc1944eb9951bc5715cfa19ef58380ed98a96119da487c191534bf36",
+    "path": "dist/module-families/module_families-0.6.0-py3-none-any.whl",
+    "sha256": "f2439ee093b1fb350202d6bbd14eac1e441dac09f976ae17d6bbe3272aafba1a",
     "built": true
   },
   "previous_measurements": {
-    "report": "final-validation-0.4.json",
-    "note": "Historical typed SQLite and preceding knowledge/scale experiments retained; the knowledge contribution loop is the new real integration measurement."
+    "report": "final-validation-0.5.json",
+    "note": "Historical contribution workflow, typed SQLite, and earlier scale/migration measurements retained."
   },
   "limits": [
-    "Evidence is unsigned local observation; hashes establish consistency, not evaluator authentication.",
-    "Private Python environments are not security sandboxes.",
-    "Acceptance is an explicit workflow, not repository-wide mandatory admission policy.",
-    "Exact JSON cases are observations, not behavioral proofs; capabilities and Python effect declarations remain trusted.",
-    "Handoffs include only missing interfaces reached by bounded search; acceptance cases must be authored.",
-    "Associated/abstract type calculus is documented design, not executable new language support.",
-    "No autonomous scheduler or multi-agent throughput experiment is included."
+    "Associated witnesses are declarations; arbitrary Python implementation behavior remains trusted.",
+    "Generic associated-value substitution within .mfl is explicitly rejected pending language integration.",
+    "Type identities are explicit or projected; applicative identity inference and fresh generative identities are not implemented.",
+    "Associated type sharing does not imply shared runtime instances.",
+    "The calculus has implementation tests, not a soundness proof or a million-agent benchmark."
   ]
 }

@@ -7,6 +7,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
+from .associated import resolve_metadata
 from .contracts import Functor, ModuleView, Requirement, Signature
 from .indices import resolve_indices
 from .planning import plan, select
@@ -164,6 +165,7 @@ def link_expression(
                 signature,
                 loaded[alias],
                 sharing=card.get("sharing", ()),
+                associated=card.get("associated", {}),
             )
         elif card.get("kind") == "module":
             if not isinstance(loaded[alias], Mapping):
@@ -203,7 +205,8 @@ def link_expression(
             )
         implementation.requirement.check(module, alias)
         indices = resolve_indices(cards[alias], {slot: child.metadata()["indices"] for slot, child in arguments.items()})
-        return module.signature.seal(module, identity=module.identity, indices=indices)
+        associated = resolve_metadata(cards[alias], {slot: child.metadata()["associated"] for slot, child in arguments.items()})
+        return module.signature.seal(module, identity=module.identity, indices=indices, associated=associated)
 
     return evaluate(concrete)
 

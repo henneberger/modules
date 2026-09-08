@@ -1,0 +1,78 @@
+{
+  "builds": [
+    {
+      "index": ".mf/associated-release/build/retrieval/index.json",
+      "member": "integrator.retrieval",
+      "open_ports": [
+        "data",
+        "embedding"
+      ],
+      "graph_sha256": "85764a69b8c94afd0e2de237191ce3ef3b6d84153a00355c927d7ea0e49aead3",
+      "wheel_sha256": "6f23952f6f6bca6591e66b8bb807aef922dc9bce19899ba46541313051a42338",
+      "artifacts": 6
+    },
+    {
+      "index": ".mf/associated-release/build/knowledge/index.json",
+      "member": "integrator.system",
+      "open_ports": [],
+      "graph_sha256": "93d0a34ad982418d3e5cfd9488290805ff07099a8125c1cf47ae9b7228864f72",
+      "wheel_sha256": "3f7126cab3cb26029432a87c7e8d8eb5a6fb60e6c8fc7a47f4b96252507c10f3",
+      "artifacts": 15
+    }
+  ],
+  "synthesis_status": "unique",
+  "program_sha256": "4a285044123ea9800ef77a4fa3a7afa4117ac7c7486cffdc164e658a7cf8dcfb",
+  "mari_source_sha256": "9ac592e50a56eb0d495fec7ba4b8a9f71e34574034dee657c5d7b9f19d75bac9",
+  "mari_source_unchanged": true,
+  "environment": {
+    "lock": ".mf/associated-release/environment/environment.lock.json",
+    "sha256": "e8707fd3dfcc6b264655bec8c0a8e145436dfbe2c952df4f3cac71335472ee87",
+    "wheels": 23,
+    "environment_locked": true
+  },
+  "replay": {
+    "assembly": "4a285044123ea9800ef77a4fa3a7afa4117ac7c7486cffdc164e658a7cf8dcfb",
+    "export": "run",
+    "result": [
+      [
+        {
+          "id": "dogs",
+          "text": "dogs are loyal pets and enjoy walks",
+          "relevance": 0.6546536707079772
+        },
+        {
+          "id": "storage",
+          "text": "sqlite stores documents in a database",
+          "relevance": 0.0
+        }
+      ],
+      [
+        {
+          "id": "python",
+          "text": "python modules compose reusable software",
+          "relevance": 0.7745966692414834
+        },
+        {
+          "id": "cats",
+          "text": "cats are independent pets and enjoy naps",
+          "relevance": 0.2182178902359924
+        }
+      ]
+    ]
+  },
+  "rejections": {
+    "vector_space": [
+      "associated type mismatch (typed export contract mismatch: embed <- embedding.embed; typed export contract mismatch: embed <- embedding.embed): equation 2: rigid type mismatch: {'nominal': 'fixture.contradictory-space', 'kind': 'identity'} != {'nominal': 'sklearn-1.8.0.hashing.n1024.unsigned.l2.default-tokenizer', 'kind': 'identity'}"
+    ],
+    "document_identity": [
+      "associated type mismatch (harness sharing; embedding.Space = retrieval.Space): equation 1: rigid type mismatch: {'nominal': 'associated-knowledge.documents.primary', 'kind': 'shared'} != {'nominal': 'fixture.other-document-namespace', 'kind': 'shared'}"
+    ]
+  },
+  "limits": [
+    "Associated witnesses are publisher declarations; Python numerical behavior is trusted.",
+    "Negative fixtures reuse existing Python with deliberately conflicting identity metadata.",
+    "Shared document identity does not establish shared store instance; same_instance remains necessary.",
+    "HashingVectorizer is lexical; ThreadPoolExecutor is not an LLM harness.",
+    "This exercises first-order associated type substitution, not generative types or generic .mfl."
+  ]
+}
