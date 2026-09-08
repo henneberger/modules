@@ -1,0 +1,46 @@
+{
+  "separate_compilation_without_providers": true,
+  "checked": {
+    "sha256": "ab9812b0b12713fd9e444a31239ad1b2607cdf1aa7cce1667a7e37e6329e77b8",
+    "effects": [
+      "sqlite"
+    ],
+    "guarantees": {
+      "nominal_value_types": true,
+      "normal_path_usage": true,
+      "lexical_call_borrows": true,
+      "declared_effect_bound": true,
+      "python_implementation_verified": false,
+      "exception_cleanup_verified": false
+    }
+  },
+  "build": {
+    "index": ".mf/typed-release/build/program/index.json",
+    "certificate": ".mf/typed-release/build/program/certificate.json",
+    "member": "builder.transaction",
+    "certificate_sha256": "ab9812b0b12713fd9e444a31239ad1b2607cdf1aa7cce1667a7e37e6329e77b8",
+    "effects": [
+      "sqlite"
+    ],
+    "artifacts": 2
+  },
+  "rejections": {
+    "rejected-use-after-move": "line 5: use after move: session",
+    "rejected-leak": "line 5: unconsumed linear resources on normal return: ['session']"
+  },
+  "program_sha256": "2fb78505f1fc90654760af1a0d29a19e1896be70da420d0f7a614d854487c4aa",
+  "environment": {
+    "lock": ".mf/typed-release/environment/environment.lock.json",
+    "sha256": "68c7457c607113362a845412af428dc558cc2a64f56e47e2fd8fe0d7c375453b",
+    "wheels": 7,
+    "environment_locked": true
+  },
+  "replay": {
+    "assembly": "2fb78505f1fc90654760af1a0d29a19e1896be70da420d0f7a614d854487c4aa",
+    "export": "run",
+    "result": [
+      "module systems",
+      "committed"
+    ]
+  }
+}

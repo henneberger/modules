@@ -1,0 +1,6 @@
+# The session can be borrowed repeatedly, but must eventually be consumed.
+session = store.begin()
+store.put(session, key, value)
+observed = store.read(session, key)
+receipt = store.commit(session)
+return observed, receipt

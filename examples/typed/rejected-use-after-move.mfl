@@ -1,0 +1,6 @@
+session = store.begin()
+store.put(session, key, value)
+receipt = store.commit(session)
+# Rejected: commit has already consumed ownership of session.
+observed = store.read(session, key)
+return observed, receipt

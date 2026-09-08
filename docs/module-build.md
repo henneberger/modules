@@ -2,6 +2,8 @@
 
 Available in 0.3.0. `resolve-module` checks an acyclic module graph; `build-module` compiles it into an ordinary Python wheel and repository publication index. A compiled graph with unfilled public ports is a module constructor. A graph without public ports is a zero-argument module factory. Both use the existing publication, synthesis, assembly locking, and offline environment commands.
 
+In 0.4.0, graph exports with typed interfaces must also preserve parameter ownership modes, nominal value/result types, and effect bounds. Local type aliases may differ, but their identities must agree. A [checked `.mfl` program](checked-language.md) can be selected as an ordinary graph node; the new language checks operation-level resource usage inside the composition.
+
 This implements **nonrecursive mixin linking through explicit module ports**: partial composition, reuse of partially linked modules, export merging through explicit projection, renaming, and binding operations to selected dependency modules. Recursive linking and automatic rebinding of ordinary Python globals are not supported.
 
 ## Author a graph in TOML

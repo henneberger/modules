@@ -2,9 +2,11 @@
 
 Current integrated test results and end-to-end checks are recorded in [final-validation.json](final-validation.json). The source artifacts below record the interpreter and scope of each measurement. Tests cover the implemented fragment; they do not establish correctness for arbitrary Python or internet-scale operation.
 
-Version 0.3.0 passes **281 tests and 32 subtests**, including 22 new graph-linking checks. Those cover partial/nested publication, explicit mixin order, shared versus fresh instances, export renaming, nominal checks, semantic-index propagation/rejection, preflight, tampered artifacts, CLI authoring, and a real offline environment replay. Ruff and the distributable wheel build pass.
+Version 0.4.0 passes **392 tests and 32 subtests**. The new checks exercise typed interface validation, separate compilation, ownership transfers and borrows, typed graph projections, branch accounting, effect bounds, and deterministic generated wheels. The [typed-language report](typed-language-validation.json) records interface-only compilation followed by SQLite provider publication, synthesis, installation, and offline execution returning `["module systems", "committed"]`. Invalid use-after-move and resource-leak examples are rejected before execution. Ruff and the distributable 0.4.0 wheel build pass.
 
-The [new candidate report](module-build-validation.json) records a complete graph built from unchanged Mari MMR source, scikit-learn lexical vectors, a cache mixin, SQLite, and a Python executor. The compiled system returns the expected first hits `dogs` and `python` in its locked offline environment. Source preservation was checked; the original `~/mari-kit` working tree remains clean. The [0.2.0 report](final-validation-0.2.json) retains earlier Mari semantic and 10,000-definition measurements; those larger historical experiments were not rerun for this linker extension.
+The [historical 0.3.0 report](final-validation-0.3.json) records **281 tests and 32 subtests**, including 22 new graph-linking checks. Those cover partial/nested publication, explicit mixin order, shared versus fresh instances, export renaming, nominal checks, semantic-index propagation/rejection, preflight, tampered artifacts, CLI authoring, and a real offline environment replay. Ruff and the distributable wheel build pass.
+
+The [0.3.0 candidate report](module-build-validation.json) records a complete graph built from unchanged Mari MMR source, scikit-learn lexical vectors, a cache mixin, SQLite, and a Python executor. The compiled system returns the expected first hits `dogs` and `python` in its locked offline environment. Source preservation was checked; the original `~/mari-kit` working tree remains clean. The [0.2.0 report](final-validation-0.2.json) retains earlier Mari semantic and 10,000-definition measurements; those larger historical experiments were not rerun for this linker extension.
 
 ## Measured workloads
 
@@ -20,7 +22,7 @@ The [new candidate report](module-build-validation.json) records a complete grap
 | Mari semantic regression | 429 upstream tests pass against verified generated cells | Exercised behavior survives extraction with documented test-namespace adaptations |
 | Ordinary offline pip | Two installed distributions; recency result is 0.5 | A selected algorithm installs without the whole source package or unrelated libraries |
 
-The current synthetic workload took approximately 0.36 seconds for discovery, 2.39 seconds for planning, and 2.59 seconds for a selected build on the recorded machine. A repeated build using the persistent analysis cache took approximately 0.58 seconds. [Full workload and measurements](build-scale-validation.json) distinguish synthetic inputs from production packages.
+The recorded 0.2.0 synthetic workload took approximately 0.36 seconds for discovery, 2.39 seconds for planning, and 2.59 seconds for a selected build on the recorded machine. A repeated build using the persistent analysis cache took approximately 0.58 seconds. [Full workload and measurements](build-scale-validation.json) distinguish synthetic inputs from production packages.
 
 The current suite checks publisher-required TOML and `pyproject.toml` authoring, contributor conflicts, source scopes and multiple roots, persistent analysis-cache invalidation, import-free discovery, grouped type exports, interface-only publications, immutable publisher ownership, exact provider/version selection, recursive capability synthesis, program locks, and checked module composition. Real TCP tests exercise independent publishers joining one family, authorization failures, verified selected downloads, archive limits, and fresh-interpreter remote atomic imports. Separate environment tests cover wheel resolution, hash verification, interpreter matching, offline synchronization, and execution. Unsupported source produces a blocked plan with its first diagnostic. See the final report for the exact tests run and outcomes; no type-theoretic proof follows from them.
 
@@ -38,6 +40,7 @@ python3 scripts/benchmark_build.py --members 10000 --fragments 1000
 python3 -m module_families build families/mari/family.toml --out dist/mari-v2
 # Requires the candidate's test and optional numerical dependencies:
 python3 scripts/validate_migration.py --build dist/mari-v2
+python3 examples/typed_system.py --work-dir .mf/typed-example
 python3 -m build --wheel
 ```
 

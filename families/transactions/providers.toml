@@ -1,0 +1,27 @@
+schema_version = 1
+
+[family]
+name = "transactions"
+version = "1.0.0"
+description = "Typed resource protocols for local transactions"
+
+[publisher]
+name = "sqlite"
+
+[source]
+root = "../../adaptations/transactions/src"
+package = "transaction_adapters"
+modules = ["transaction_adapters.sqlite"]
+license_files = ["../../LICENSE"]
+
+[[members]]
+id = "store"
+kind = "module-factory"
+symbol = "transaction_adapters.sqlite:create"
+summary = "Opaque linear transactions backed by an in-memory SQLite database."
+version = "1.0.0"
+provides = { id = "transactions.store", version = "1" }
+requires = {}
+capabilities = ["transactional-key-value-storage"]
+effects = ["sqlite"]
+implementation_trust = "trusted-python"

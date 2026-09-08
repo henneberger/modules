@@ -1,5 +1,7 @@
 # Runtime module contracts
 
+Version 0.4.0 adds optional interface `typing` metadata for nominal value types, shared/affine/linear usage, parameter modes, results, and operation effects. [Checked `.mfl` programs](checked-language.md) consume those declarations at build time. The ordinary runtime `Signature` described below continues to check call shapes and nominal Python type exports; it does not itself become a general value type checker. Generated checked operations use separate ownership guards.
+
 Version 0.3.0 also supports declared semantic indices with `Signature.seal(..., indices={"Space": "identity"})`. They appear in `ModuleView.metadata()["indices"]`. Repository composition checks member `index_requires`, `index_sharing`, and `index_exports`, and preserves resolved indices on results. These are assertions about compatibility, separate from live nominal type equality. See the [module build guide](module-build.md).
 
 A family groups software by problem domain. A signature defines an interface under a specific contract ID and version. Only a provider satisfying the required signature is eligible for a module binding; being in the payment family is insufficient.

@@ -202,6 +202,11 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--max-states", type=int, default=10000)
         command.add_argument("--max-solutions", type=int, default=16)
     module_build.add_argument("--choice", type=int)
+    program_check = sub.add_parser("check-program", help="Typecheck .mfl composition against interfaces without concrete providers")
+    program_build = sub.add_parser("build-program", help="Compile a resource-checked .mfl program into a published Python constructor")
+    for command in (program_check, program_build):
+        command.add_argument("program", help="TOML manifest referencing .mfl source")
+        command.add_argument("--out", required=command is program_build)
     synthesize = sub.add_parser(
         "synthesize",
         help="Construct programs recursively from an interface and capability goal",
@@ -279,6 +284,8 @@ def parser() -> argparse.ArgumentParser:
         resolve,
         module_resolve,
         module_build,
+        program_check,
+        program_build,
         synthesize,
         assembly_lock,
         execute,
@@ -454,6 +461,13 @@ def main(argv: list[str] | None = None) -> int:
                 _emit(registry.interfaces(limit=args.limit, offset=args.offset))
             elif args.command == "interface":
                 _emit(registry.interface(args.id, args.version))
+            elif args.command in {"check-program", "build-program"}:
+                from .typed_program import build_program, check_program
+
+                if args.command == "build-program":
+                    _emit(build_program(args.program, registry, args.out))
+                else:
+                    _emit(check_program(args.program, registry), args.out)
             elif args.command in {"resolve-module", "build-module"}:
                 from .module_build import build_module, resolve_module
 

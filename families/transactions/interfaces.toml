@@ -1,0 +1,32 @@
+schema_version = 1
+
+[family]
+name = "transactions"
+version = "1.0.0"
+description = "Typed resource protocols for local transactions"
+
+[publisher]
+name = "interfaces"
+
+[[interfaces]]
+id = "transactions.store"
+version = "1"
+types = []
+
+[interfaces.callables]
+begin = { parameters = [], asynchronous = false }
+read = { parameters = [{name = "session", kind = "POSITIONAL_OR_KEYWORD", required = true}, {name = "key", kind = "POSITIONAL_OR_KEYWORD", required = true}], asynchronous = false }
+put = { parameters = [{name = "session", kind = "POSITIONAL_OR_KEYWORD", required = true}, {name = "key", kind = "POSITIONAL_OR_KEYWORD", required = true}, {name = "value", kind = "POSITIONAL_OR_KEYWORD", required = true}], asynchronous = false }
+commit = { parameters = [{name = "session", kind = "POSITIONAL_OR_KEYWORD", required = true}], asynchronous = false }
+abort = { parameters = [{name = "session", kind = "POSITIONAL_OR_KEYWORD", required = true}], asynchronous = false }
+
+[interfaces.typing.types]
+Session = { id = "transactions.sqlite.session@1", usage = "linear", representation = "opaque" }
+Text = { id = "python.str", usage = "shared", representation = "str" }
+
+[interfaces.typing.operations]
+begin = { parameters = {}, returns = ["Session"], effects = ["sqlite"] }
+read = { parameters = {session = {type = "Session", mode = "borrow"}, key = {type = "Text", mode = "share"}}, returns = ["Text"], effects = ["sqlite"] }
+put = { parameters = {session = {type = "Session", mode = "borrow"}, key = {type = "Text", mode = "share"}, value = {type = "Text", mode = "share"}}, returns = [], effects = ["sqlite"] }
+commit = { parameters = {session = {type = "Session", mode = "move"}}, returns = ["Text"], effects = ["sqlite"] }
+abort = { parameters = {session = {type = "Session", mode = "move"}}, returns = [], effects = ["sqlite"] }

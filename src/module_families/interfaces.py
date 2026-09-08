@@ -1,8 +1,10 @@
 """Serializable interface declarations, interpreted without eval or imports.
 
-Interfaces describe accepted call shapes and named nominal type exports. They
-do not deserialize Python types, evaluate annotations or defaults, import an
-implementation, or prove returned values and behavioral laws.
+Interfaces describe accepted call shapes and named nominal type exports. Optional
+typing metadata declares the assumptions used by the checked composition language.
+Validation does not verify resource usage or effects inside Python implementations.
+Interfaces do not deserialize Python types, evaluate annotations or defaults,
+import an implementation, or prove returned values and behavioral laws.
 """
 
 from __future__ import annotations
@@ -62,7 +64,7 @@ def validate_interface_reference(reference: Any) -> dict[str, str]:
 
 
 def _interpret(spec: Any) -> Signature:
-    spec = _shape(spec, {"id", "version", "callables", "types"}, "interface")
+    spec = _shape(spec, {"id", "version", "callables", "types", "typing"}, "interface")
     reference = validate_interface_reference(
         {key: spec.get(key) for key in ("id", "version")}
     )
@@ -135,18 +137,114 @@ def _interpret(spec: Any) -> Signature:
         raise InterfaceError(str(error)) from error
 
 
+def _typing(spec: dict, signature: Signature) -> dict:
+    """Validate the first-order typed language without importing Python code."""
+    declaration = _shape(spec, {"types", "operations"}, "interface typing")
+    types = declaration.get("types")
+    operations = declaration.get("operations")
+    if not isinstance(types, dict) or not isinstance(operations, dict):
+        raise InterfaceError("typing requires types and operations objects")
+    normalized_types = {}
+    for name in types:
+        _name(name, "typed local type")
+    for name, value in sorted(types.items()):
+        value = _shape(value, {"id", "usage", "representation"}, f"typing.types.{name}")
+        identity = value.get("id")
+        if not isinstance(identity, str) or not identity or identity != identity.strip():
+            raise InterfaceError(f"typed type {name}.id must be a nonempty trimmed string")
+        usage = value.get("usage")
+        representation = value.get("representation")
+        if not isinstance(usage, str) or usage not in {"shared", "affine", "linear"}:
+            raise InterfaceError(f"typed type {name}.usage must be shared, affine, or linear")
+        if not isinstance(representation, str) or representation not in {
+            "opaque", "str", "int", "float", "bool", "bytes"
+        }:
+            raise InterfaceError(f"typed type {name}.representation is unsupported")
+        normalized_types[name] = {
+            "id": identity, "usage": usage, "representation": representation
+        }
+    identities = {}
+    for value in normalized_types.values():
+        identity = value["id"]
+        properties = (value["usage"], value["representation"])
+        if identity in identities and identities[identity] != properties:
+            raise InterfaceError(f"typed identity {identity} has inconsistent declarations")
+        identities[identity] = properties
+    if set(operations) != set(signature.callables):
+        raise InterfaceError("typed operations must match all callable exports exactly")
+    normalized_operations = {}
+    for name, callable_spec in signature.callables.items():
+        value = _shape(
+            operations[name], {"parameters", "returns", "effects"}, f"typing.operations.{name}"
+        )
+        if callable_spec.asynchronous:
+            raise InterfaceError(f"typed operation {name} must be synchronous")
+        parameters = value.get("parameters")
+        shape = callable_spec.signature.parameters
+        if not isinstance(parameters, dict) or set(parameters) != set(shape):
+            raise InterfaceError(f"typed operation {name} parameters must match its call shape")
+        normalized_parameters = {}
+        for parameter_name, parameter in shape.items():
+            if parameter.kind not in {
+                inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD
+            } or parameter.default is not inspect.Parameter.empty:
+                raise InterfaceError(
+                    f"typed operation {name} supports only required positional parameters"
+                )
+            binding = _shape(
+                parameters[parameter_name], {"type", "mode"},
+                f"typing.operations.{name}.parameters.{parameter_name}"
+            )
+            local_type = binding.get("type")
+            if not isinstance(local_type, str) or local_type not in normalized_types:
+                raise InterfaceError(f"typed parameter {name}.{parameter_name} has unknown type")
+            mode = binding.get("mode")
+            usage = normalized_types[local_type]["usage"]
+            allowed = {"share"} if usage == "shared" else {"move", "borrow"}
+            if not isinstance(mode, str) or mode not in allowed:
+                raise InterfaceError(f"typed parameter {name}.{parameter_name} has invalid mode for {usage}")
+            normalized_parameters[parameter_name] = {"type": local_type, "mode": mode}
+        returns = value.get("returns")
+        if not isinstance(returns, list) or any(
+            not isinstance(item, str) or item not in normalized_types for item in returns
+        ):
+            raise InterfaceError(f"typed operation {name}.returns must list declared local types")
+        effects = value.get("effects")
+        if not isinstance(effects, list) or any(
+            not isinstance(item, str) or not item or item != item.strip() for item in effects
+        ):
+            raise InterfaceError(f"typed operation {name}.effects must list nonempty trimmed strings")
+        if len(set(effects)) != len(effects):
+            raise InterfaceError(f"typed operation {name}.effects must be distinct")
+        normalized_operations[name] = {
+            "parameters": normalized_parameters, "returns": list(returns), "effects": sorted(effects)
+        }
+    return {"types": normalized_types, "operations": normalized_operations}
+
+
 def validate_interface(spec: dict) -> dict:
     """Return a defensive, canonical JSON declaration or raise InterfaceError.
 
     Parameter order is significant. Optional defaults are represented only by
     ``required = false``; their values are deliberately outside this schema.
     """
-    return _interpret(spec).metadata()
+    signature = _interpret(spec)
+    result = signature.metadata()
+    if "typing" in spec:
+        result["typing"] = _typing(spec["typing"], signature)
+    return result
 
 
 def signature_from_spec(spec: dict) -> Signature:
-    """Construct a runtime Signature solely from validated declarative data."""
-    return _interpret(spec)
+    """Validate all metadata and construct the runtime call-shape Signature.
+
+    Typed metadata remains in ``validate_interface`` output for the composition
+    compiler; the runtime Signature itself does not enforce ownership or effects.
+    """
+    signature = _interpret(spec)
+    if "typing" in spec:
+        _typing(spec["typing"], signature)
+    return signature
 
 
 __all__ = [

@@ -317,6 +317,18 @@ def _check_graph(doc, cards, repository):
         raise ModuleBuildError(
             "exports must exactly implement the public signature; rename or project explicitly"
         )
+
+    def typed_operation(spec, export):
+        typing = spec["typing"]
+        operation = typing["operations"][export]
+        return {
+            "parameters": {
+                name: {**typing["types"][value["type"]], "mode": value["mode"]}
+                for name, value in operation["parameters"].items()
+            },
+            "returns": [typing["types"][name] for name in operation["returns"]],
+        }, set(operation["effects"])
+
     for name, path in doc["exports"].items():
         owner, export = path.split(".")
         if name in result["types"]:
@@ -326,6 +338,23 @@ def _check_graph(doc, cards, repository):
             raise ModuleBuildError(
                 f"export call contract mismatch: {name} <- {path}; use an explicit adapter"
             )
+        elif "typing" in result:
+            source = signatures[owner]
+            if "typing" not in source:
+                raise ModuleBuildError(
+                    f"typed export requires a typed source contract: {name} <- {path}"
+                )
+            actual, actual_effects = typed_operation(source, export)
+            expected, expected_effects = typed_operation(result, name)
+            if actual != expected:
+                raise ModuleBuildError(
+                    f"typed export contract mismatch: {name} <- {path}; use an explicit adapter"
+                )
+            if not actual_effects <= expected_effects:
+                raise ModuleBuildError(
+                    f"typed export effects exceed result contract: {name} <- {path}: "
+                    f"{sorted(actual_effects - expected_effects)}"
+                )
     # Every selected node/port must contribute to the public dependency graph.
     used = {path.split(".")[0] for path in doc["exports"].values()}
     used.update(path.split(".")[0] for path in doc["indices"].values())

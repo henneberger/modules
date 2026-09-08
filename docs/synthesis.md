@@ -4,6 +4,8 @@ The public workflow is `goal.toml → synthesize → lock-assembly → lock-env 
 
 In 0.3.0, [compiled open module graphs](module-build.md) are also published constructors. They encapsulate fixed internal wiring and shared node instances; synthesis recursively fills their remaining ports. Graph compilation itself selects providers for an authored topology, rather than inventing arbitrary graphs. Declared semantic index equalities and required identities are checked alongside interface requirements.
 
+In 0.4.0, [checked `.mfl` programs](checked-language.md) supply another kind of published constructor. Their operation bodies have already been checked against typed interfaces before providers are selected. Synthesis fills the module ports and locks the typed interface records. It does not generate new `.mfl` source or verify arbitrary Python provider bodies; those remain an explicit trust boundary.
+
 ## Implemented calculus
 
 For a finite repository candidate set, expressions have the form:

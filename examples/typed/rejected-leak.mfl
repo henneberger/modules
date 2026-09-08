@@ -1,0 +1,5 @@
+session = store.begin()
+store.put(session, key, value)
+observed = store.read(session, key)
+# Rejected: the linear session remains live when this program returns.
+return observed, "uncommitted"

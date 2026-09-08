@@ -1,0 +1,26 @@
+schema_version = 1
+
+[family]
+name = "transactions"
+version = "1.0.0"
+description = "Typed resource protocols for local transactions"
+
+[publisher]
+name = "builder"
+
+[module]
+id = "transaction"
+version = "1.0.0"
+provides = { id = "transactions.workflow", version = "1" }
+summary = "Write and read a value, then consume the transaction by committing."
+capabilities = ["transactional-key-value-workflow"]
+
+[ports.store]
+requires = { id = "transactions.store", version = "1" }
+
+[program]
+source = "transaction.mfl"
+export = "run"
+
+[policy]
+allowed_effects = ["sqlite"]
