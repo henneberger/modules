@@ -335,6 +335,7 @@ def run_worker_once(
                 {
                     "attempt": lease["attempts"],
                     "previous_error": lease.get("previous_error"),
+                    "previous_submission": lease.get("previous_submission"),
                 }
             )
         )

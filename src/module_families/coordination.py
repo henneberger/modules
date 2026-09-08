@@ -153,11 +153,12 @@ class CoordinationQueue:
                 ORDER BY t.priority DESC,t.created,t.id LIMIT 1""").fetchone()
             if row is None:
                 return None
-            previous_error = self._task(db, row[0])["error"]
+            previous = self._task(db, row[0])
             db.execute("UPDATE tasks SET state='leased',attempts=attempts+1,fence=fence+1,worker=?,lease_until=?,submission=NULL,submission_sha256=NULL,error=NULL WHERE id=?",
                        (worker, now + lease_seconds, row[0]))
             result = self._task(db, row[0])
-            result["previous_error"] = previous_error
+            result["previous_error"] = previous["error"]
+            result["previous_submission"] = previous["submission"]
             return result
 
     @staticmethod

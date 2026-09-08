@@ -225,3 +225,34 @@ def test_campaign_round_limit_and_immutable_resume(campaign, wheelhouse):
     path.write_text(path.read_text().replace("rounds=1", "rounds=2"))
     with pytest.raises(CampaignError, match="immutable"):
         run(campaign, wheelhouse)
+
+
+def test_evaluation_failure_repairs_new_version_and_composes(campaign, wheelhouse):
+    root, base, staging, _ = campaign
+    driver = root / "driver.py"
+    source = driver.read_text()
+    source = source.replace(
+        "(root/'src/implementation/__init__.py').write_text(source)",
+        """if task == 'increment':
+    if feedback['attempt'] == 1:
+        source = source.replace('+1', '+2')
+    else:
+        previous = feedback['previous_submission']['candidate']
+        assert previous['version'] == '1.0.1'
+        assert 'actual' in feedback['previous_error']
+        assert '9' in feedback['previous_error']
+(root/'src/implementation/__init__.py').write_text(source)""",
+    )
+    driver.write_text(source)
+    result = run(campaign, wheelhouse)
+    assert result["status"] == "complete"
+    assert result["rounds"] == 3
+    increment = next(task for task in result["tasks"] if task["id"].endswith(":increment"))
+    assert increment["attempts"] == 2
+    staged_versions = staging.versions("increment", "agent.run")
+    assert {member["version"] for member in staged_versions} == {"1.0.1", "1.0.2"}
+    accepted_versions = base.versions("increment", "agent.run")
+    assert [member["version"] for member in accepted_versions] == ["1.0.2"]
+    lock = json.loads((root / "work/program.lock.json").read_text())
+    assert lock["evidence"]["observations"]
+    assert len(lock["bindings"]) == 2

@@ -11,6 +11,14 @@ original acceptance cases, and satisfied evidence-required synthesis. The
 [smaller adaptation record](live-agent-validation.json) covers a source-preserving
 standard-library chunker and a rejected ill-specified initial contract.
 
+The subsequent [repair validation](live-repair-validation.json) seeds incorrect
+long-word handling in the standard-library chunker. One real Codex invocation
+receives evaluator feedback and publishes version 1.0.2; rejected version 1.0.1
+remains in staging and is absent from the accepted repository. The affected
+campaign, worker, and queue suites pass 45 tests, including failed evaluation →
+repair → independently composed dependency → evidence-required final lock. This
+is a bounded repair example, not a comparative model reliability measurement.
+
 The [coordination experiment](coordination-scale.md) exercises one million task
 records, eight worker processes, and 16,000 synthetic accepted workflows. It does
 not measure one million active agents or include model/evaluation costs. Federation

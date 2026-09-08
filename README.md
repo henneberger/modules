@@ -339,6 +339,11 @@ The agent writes the module graph; Mari ranking, scikit-learn embeddings, SQLite
 storage, and the query harness remain existing Python implementations. Evaluation
 checks the resulting knowledge system before publication.
 
+The [recorded repair run](docs/live-repair-validation.json) starts with an
+incorrect chunker. Evaluation rejects it; a real agent reads the failure feedback
+and publishes a corrected version. Rejected and repaired artifacts retain distinct
+immutable identities, and only the passing repair reaches the accepted repository.
+
 The [campaign coordinator](docs/campaigns.md) accepts a TOML task DAG and a final
 system goal. Tasks become eligible after their prerequisites are accepted; each
 agent has bounded attempts, leases, and evaluation feedback. The coordinator

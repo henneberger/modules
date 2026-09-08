@@ -85,7 +85,10 @@ command = [
 `{campaign}` is the campaign manifest's directory. The remaining placeholders
 refer to a private work directory for this attempt. `task.json` is the immutable
 prepared contract. `feedback.json` supplies the attempt number and the previous
-rejection or worker failure message; the task hash does not change on a retry.
+rejection or worker failure message, including bounded observed case results.
+`previous_submission` preserves the immediately preceding submitted candidate
+identity (or worker error), so a repair agent can distinguish rejected versions.
+The task hash does not change on a retry.
 The task payload never chooses the executable or command arguments.
 
 Driver processes receive a small environment allowlist for operating-system
@@ -117,8 +120,12 @@ manifest, then writes a proposal such as:
 The manifest must reside inside the attempt workspace. The worker builds it and
 publishes its candidate artifact into **staging**. A revised implementation needs
 a new immutable member version; an agent cannot overwrite the previous attempt's
-published identity. The prior attempt number in feedback can inform version
-selection.
+published identity. The bundled Codex driver uses a task-specific member ID and an attempt-specific
+member version, preserving the family header. Custom drivers must also publish
+repairs under fresh member versions. The campaign regression test rejects an
+incorrect increment implementation, repairs it from actual evaluator feedback,
+retains both staged versions, admits only the passing version, and locks its
+composition with the independently contributed dependency.
 
 Drivers and candidate Python are executable code. Run untrusted implementations
 inside an operator-provided sandbox or isolated worker host. A virtual environment
@@ -133,7 +140,7 @@ sharing signing authority. The existing shared-secret HMAC mode remains availabl
 for a single explicitly trusted evaluator domain.
 
 ```sh
-module-families campaign campaign.toml \
+.venv/bin/mf campaign campaign.toml \
   --queue .mf/knowledge-campaign/queue.sqlite \
   --registry .mf/accepted \
   --staging .mf/candidates \

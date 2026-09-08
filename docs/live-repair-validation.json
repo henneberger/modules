@@ -1,0 +1,35 @@
+{
+  "actual_model_invocations": 1,
+  "seeded_defect": "textwrap long-word splitting disabled",
+  "initial_evaluation": "rejected",
+  "repair_evaluation": "accepted",
+  "task_sha256": "14ccb835d255047b614ba3bfe6de3d9bb74e82c95aa0e6448125de826e106bdc",
+  "staged_versions": [
+    "1.0.2",
+    "1.0.1"
+  ],
+  "accepted_versions": [
+    "1.0.2"
+  ],
+  "attestation": {
+    "payload": {
+      "format": "module-families-evaluator-attestation-1",
+      "evaluator": "repair-ci",
+      "task_sha256": "14ccb835d255047b614ba3bfe6de3d9bb74e82c95aa0e6448125de826e106bdc",
+      "environment_sha256": "5ec25df5e30a3b1d75896634ac1264e31e37932584247427b06403c7e69cf017",
+      "program_sha256": "73f47cd2bed02664bfb297246ae2b6d175d0fae4ed9c93c38c3c763f5e385102",
+      "evidence_sha256": "12e14a63c60d0fdd111e080d3658d739a5f25b8cbc45c215e6575c431f73071f",
+      "context_sha256": "ea1bf466a76660d7a7e23e2ed9f15352fbe8edfd268c31373ea4f001b5723b42",
+      "environment_fingerprint": "ef381ee7ffd7c6ec89458de19986550dc8e8be2dd63279787821fcc63ef0ef05",
+      "status": "passed"
+    },
+    "signature": "6fb3bbd0b8a2b68ea800ef2a6b944f3c8e744a5114bab3b556ea0d4ffbbc50b8",
+    "sha256": "55fdc239d7f41b265d9580c8a46e7470704f24c8db1a5b1193a7aafc12528187"
+  },
+  "validation": {
+    "affected_tests": 45,
+    "command": ".venv/bin/pytest -q tests/test_campaigns.py tests/test_coordination.py tests/test_workers.py --tb=short",
+    "seconds": 35.13
+  },
+  "scope": "One real repair invocation after an operator-seeded defect; local trusted execution, not an agent reliability or security-isolation benchmark."
+}
