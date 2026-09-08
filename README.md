@@ -1,42 +1,222 @@
 # Module Families
 
-A Python module build system and repository that **synthesizes executable programs from interface and capability goals**. It adapts existing Python into independently published components, discovers implementations, recursively fills module requirements, and locks a selected composition for execution.
+**A module system for software projects built by millions of agents.**
 
-Families are shared ecosystems. A publisher owns its contributions, rather than every implementation in a family. Interfaces, reusable type libraries, implementations, and module constructors can be released separately. Packaging and graph authoring use TOML; checked compositions use `.mfl`; expanded indexes, search results, and locks are generated JSON. There are no compatibility paths for earlier manifests or repository schemas.
+Our goal is to let millions of agents contribute to one software project through small, typed, independently composable units of work. An agent should be able to work on a ranking algorithm, storage adapter, or retrieval subsystem against a precise local contract. Other agents should be able to discover that contribution, check whether it fits, and compose it into a larger program.
 
-Version 0.4.0 adds a **checked module composition language**, alongside the TOML graph builder. TOML publishes interfaces and connects module ports; `.mfl` expresses programs with checked value types, resource usage, and declared effects; ordinary Python implements the operations. The compiler produces normal Python wheels. Agents can check and publish a composition against interfaces before its concrete providers exist.
+This requires more than distributing smaller packages. We need to express what a component needs, which types and resources it shares with its neighbors, how its behavior can be extended, and which combinations are valid. Module Families brings ideas from ML module systems into Python's build and distribution layer, with ordinary Python as the implementation language.
 
-## Why extend the language?
+The project combines a build system, a checked composition language, and a repository. Its central idea is that the structure of software can become the structure of collaboration: types describe the work, module requirements expose what is missing, and composition turns independent contributions into a running system.
 
-A module signature should describe more than which functions exist. A transaction handle can be borrowed for an operation, transferred into commit, and then become unavailable. An embedding vector can belong to a specific nominal type. A composition can require that every called operation fits an effect bound. Those are rules for constructing programs, and a checked language can reject violations before running Python.
+## The problem: building a knowledge base together
 
-Our `.mfl` language deliberately accepts a small Python-shaped grammar. It is compiled separately; a `.mfl` file is not an unrestricted Python script. This follows Backpack's useful separation between checking against interfaces and later choosing implementations. It is not a complete implementation of Backpack's type system.
+Consider an enterprise knowledge base answering questions across product manuals, support tickets, internal documents, and source code. A useful system might need:
 
-| Layer | What users write | What it establishes |
-| --- | --- | --- |
-| Contracts and packaging | TOML | Exact interfaces, nominal type identities, usage modes, effect declarations, and repository requirements. |
-| Checked composition | `.mfl` | Type compatibility, resource accounting on every normal return path, and a bound on declared operation effects. |
-| Implementations | Ordinary Python | Actual algorithms, model calls, stores, and resource operations; their behavioral contracts remain trusted. |
-| Distribution | Generated wheels and locks | Exact compiled code and selected dependency closure for replay. |
+- Connectors and parsers for different sources, with document identity and provenance preserved.
+- Chunking and embedding strategies suited to different content.
+- Storage, retrieval, filtering, reranking, and citation assembly.
+- An execution harness that can use a model, retrieve additional evidence, and manage work.
+- Caching, retries, evaluation, and resource management around those operations.
 
-## Learn through a transaction
+There may be thousands of useful algorithms within each category. A team working on legal documents may contribute a different chunker; another may contribute a multilingual ranker; another may adapt an existing database. A single owner should not have to maintain all of these implementations. Nor should every improvement require editing one enormous application or publishing its entire dependency ecosystem again.
 
-The [published store contract](families/transactions/interfaces.toml) declares an opaque **linear** `Session` and reusable `Text` values. Its operations have these meanings:
+Suppose one agent improves query embedding while another rebuilds the index. Both implementations return arrays of the expected length, and both pass their own API tests. The combined system can still produce meaningless retrieval if the arrays belong to different embedding spaces. This is a practical constraint: Azure AI Search's vector-query guidance calls for using the same embedding model for queries and indexed documents. [Vector query documentation](https://learn.microsoft.com/en-us/azure/search/vector-search-how-to-query).
 
-```text
-begin()                              -> Session
-put(borrow Session, share Text, share Text) -> ()
-read(borrow Session, share Text)      -> Text
-commit(move Session)                 -> Text
-abort(move Session)                  -> ()
-```
+Or suppose ingestion and retrieval both require a document store. Choosing the same database library twice does not mean they see the same store instance. With two in-memory stores, ingestion succeeds and retrieval sees nothing.
 
-`borrow` lends the handle for one synchronous call. `move` transfers ownership and makes the old binding unavailable. Borrowing does not itself imply read-only access: `put` mutates the session under its declared effect contract.
+These are relationships between components. They belong in the description of the system, where a build can check them, instead of depending on every contributor remembering them.
 
-The actual [transaction.mfl](examples/typed/transaction.mfl) composition is:
+## Why API contracts are insufficient on their own
+
+An ordinary API contract describes how to call something. It often leaves the relationships needed to assemble a complete system implicit.
 
 ```python
-# .mfl — checked composition; key and value come from the public contract.
+embed(text: str) -> list[float]
+search(vector: list[float]) -> list[Document]
+```
+
+These shapes do not answer:
+
+| Question | Why it matters | What a richer module contract can express |
+| --- | --- | --- |
+| Were these vectors produced in the index's embedding space? | Equal dimensions do not imply comparable coordinates. | A shared semantic identity for the space. |
+| Does the parser produce the document type the store accepts? | Similar fields do not establish the same nominal type. | Shared exported types or explicit nominal value identities. |
+| Do ingestion and retrieval use the same store? | The same implementation can create separate state. | An explicit shared node and instance constraint. |
+| Can this retrieval module use any suitable embedding provider? | Hardcoded imports prevent independent replacement. | An unfilled requirement for an embedding signature. |
+| Can we enrich embedding with a cache? | Every consumer should see the selected enrichment consistently. | A wrapper module connected through dependency ports. |
+| Can the composition reuse a committed transaction? | A callable signature alone does not describe resource consumption. | Ownership modes and checked operation sequences. |
+| Does this composition fit the allowed effects? | A compatible function may still declare network or storage effects. | Declared operation effects and composition bounds. |
+
+API specifications can be extended to encode some of this. The important step is giving those declarations composition rules and a checker that uses them. Otherwise they remain prose obligations that every agent must rediscover and reconcile.
+
+APIs still connect the running system to users and external services. Module contracts describe how to construct that system. An adapter for a remote API can itself be a module with explicit dependencies, types, and effects.
+
+## Types make independent work composable
+
+Types are useful here because they carry assumptions across a boundary. They let a contributor depend on a statement such as “I receive documents of this identity” without reading every implementation that might produce them.
+
+A module **signature** describes its exported operations and types. A **module constructor**, traditionally called a functor, takes modules satisfying required signatures and produces another module. Its requirement can say:
+
+```text
+I need an EMBEDDING and a DOCUMENT_STORE.
+Given those, I provide RETRIEVAL.
+```
+
+That statement can be published before the concrete embedding and storage implementations have been chosen. A subsystem can be checked, reused, and extended while some of its requirements remain open.
+
+A useful system contract expresses several kinds of agreement:
+
+| Mechanism | Example | Meaning |
+| --- | --- | --- |
+| Call shape | `search(query, limit)` | The required exports and parameter shapes match. |
+| Shared Python type | `parser.Document = store.Document` | Declared type relationships are checked; runtime linking checks actual type-object identity. |
+| Nominal value type | `knowledge.document@1` | Checked compositions treat the same explicit identity as the same value type; local aliases may differ. |
+| Semantic index | `embedding.Space = index.Space` | Opaque declared identities must agree, for example on encoder revision, preprocessing, and metric. |
+| Shared instance | `retrieval.data = harness.data` | Both slots are wired to the same named graph node or port. |
+| Usage and effects | Borrow a session, then move it into commit. | The checked language accounts for ownership and declared operation effects. |
+
+Types also make the search space intelligible. An agent looking for a reranker should see candidates that accept its document type and preserve the identities needed for citations. An integration agent should reject an incompatible embedding space before spending time evaluating retrieval quality. Types establish which compositions make sense; evaluations distinguish the useful ones.
+
+The longer-term direction is to publish reusable vocabularies of documents, chunks, citations, model capabilities, resource protocols, and permitted effects. A contributor can then improve one operation while preserving the relationships the rest of the system depends on.
+
+## Designing for millions of agents on one project
+
+The scaling principle is **bounded local knowledge and hierarchical composition**. A project can have a very large contribution ecosystem while each task and each executable uses a much smaller slice of it.
+
+A ranking contributor should need the ranking contract, relevant shared types, permitted dependencies, and an evaluation task. It should not need the implementation of the billing service, every document connector, or every competing ranker. An integration agent should be able to select a published retrieval subsystem without reopening all of its internal decisions.
+
+The intended contribution loop is:
+
+1. Define a subsystem's public signature and the signatures it may require.
+2. Give contributors the relevant contract slice. The graph builder emits `work-contract.json` and Python Protocol stubs; the checked-program builder emits its typed work contract.
+3. Implement or adapt ordinary Python, or compose existing modules. Contributions can live under separate publisher identities in one family.
+4. Check and publish each contribution independently. Checked `.mfl` compositions can be checked against interfaces before providers exist.
+5. Compose validated contributions into a subsystem and publish that subsystem with any remaining requirements.
+6. Select and lock a complete composition for a particular application or experiment.
+
+Imagine a million-agent effort organized around a shared knowledge platform. Some groups improve ingestion for particular document formats. Others explore ranking algorithms, storage backends, model harnesses, or evaluation methods. Within each group, agents work against smaller contracts. Successful compositions become reusable subsystems, which become inputs to the next level of composition.
+
+The project is shared through its contracts and contribution graph. Agents do not all need to edit the same checkout or attend to the same global stream of changes. A subsystem becomes another module: its consumer sees the exported contract and remaining requirements, while the exact implementation closure stays available for building and audit.
+
+This is also why finer-grained publication matters. A new algorithm should become available as soon as it satisfies its contribution contract. It should not wait for the release schedule of every other algorithm in the family. A consumer should be able to try it in one selected composition while everyone else continues using their locked programs.
+
+Several design choices support this direction:
+
+| Coordination problem | Architectural response |
+| --- | --- |
+| Everyone edits a global inventory. | Discover source locally and publish independent contribution manifests. |
+| One family owner becomes the ecosystem's bottleneck. | Let independent publishers contribute implementations and new dependencies. |
+| Every agent needs the entire source tree. | Give each task the relevant signatures, shared types, and open requirements. |
+| Every consumer must inspect every algorithm. | Discover by contract and capability; reuse composed subsystems as selection units. |
+| A new provider changes everyone's application. | Publish immutable versions and lock each selected program. |
+| Every algorithm ships its whole library. | Build only the selected members and their reachable implementation dependencies. |
+
+The hardest work moves into designing good boundaries. A useful contract must be small enough to understand and expressive enough to capture the relationships that matter. Shared type libraries prevent every contributor from inventing another incompatible document model. Open modules let contributors leave legitimate choices to downstream builders. Hierarchical composition lets local progress accumulate into a much larger system.
+
+Agents can make this level of explicit structure practical. They can inspect contracts, find candidate dependencies, generate adaptations, and propose compositions at a granularity that would be tedious to maintain manually. The build system supplies the common rules for accepting and connecting those contributions. The ambition is a project that continuously explores many implementations while retaining coherent, reproducible executable systems.
+
+## A module family is an ecosystem
+
+A family groups contributions around a problem domain and its context: retrieval, payment processing, embeddings, parsing, or data storage. It can contain interfaces, reusable type libraries, algorithms, adapters, and constructors.
+
+A publisher owns its contributions, not the entire family. Two independent publishers can add implementations of the same interface. An interface-only release can establish a contract before implementations arrive. New members and member versions can be published incrementally, while existing program locks retain their original selections.
+
+For example, a ranking family can contain `alice.temporal_decay` and `bob.diversity_ranker`. Alice does not need to acquire Bob's code or republish it. A third publisher can contribute a constructor that combines suitable ranking components.
+
+Families also provide context for discovery, while individual members declare capabilities and requirements. The larger repository should connect these declarations to evaluations and provenance, so agents can discover both what fits and what has worked for comparable problems.
+
+## Three authoring layers, ordinary Python execution
+
+| Layer | Authored files | Role |
+| --- | --- | --- |
+| Implementation | `.py` | Existing algorithms, adapters, factories, and actual service operations. |
+| Packaging and module graphs | `.toml` | Discovery, publication, signatures, open ports, provider selection, links, sharing, and policies. |
+| Checked operation composition | `.mfl` plus a TOML manifest | Value types, ownership transfers, borrows, branches, and declared effect bounds. |
+
+The build emits ordinary Python wheels, fixed generated wiring, and provenance. Selected modules are initialized in the compiled order. Running a compiled module does not ask the repository to select providers again.
+
+JSON indexes, locks, checker reports, and work contracts are generated artifacts. An expanded inventory is not something contributors maintain by hand. Source authoring is TOML, with `.mfl` where operation-level checking is needed. This research release provides no compatibility paths for older manifests or repository schemas.
+
+### Compose a knowledge system at the build layer
+
+The repository includes an executable knowledge-retrieval example using:
+
+- Mari's preserved maximal marginal relevance algorithm for diversified ranking.
+- scikit-learn's `HashingVectorizer` for lexical vectors.
+- A caching wrapper around the embedding module.
+- SQLite for documents.
+- `ThreadPoolExecutor` as an execution harness.
+
+The [open retrieval module](examples/modules/retrieval.toml) selects a ranker and retrieval constructor, leaving embedding and data as requirements. These are excerpts from that manifest:
+
+```toml
+[ports.embedding]
+requires = { id = "knowledge.embedding", version = "1" }
+
+[ports.data]
+requires = { id = "knowledge.documents", version = "1" }
+
+[links]
+"retrieval.embedding" = "embedding"
+"retrieval.data" = "data"
+"retrieval.ranker" = "ranker"
+
+[exports]
+search = "retrieval.search"
+
+[indices]
+Space = "embedding.Space"
+```
+
+Publishing this module makes retrieval reusable without choosing storage and embedding for every future consumer. The [complete system](examples/modules/knowledge.toml) then selects providers and connects the remaining ports:
+
+```toml
+[links]
+"embedding.base" = "base"
+"retrieval.embedding" = "embedding"
+"retrieval.data" = "data"
+"harness.retrieval" = "retrieval"
+"harness.data" = "data"
+
+[constraints]
+same_instance = [["retrieval.data", "harness.data"]]
+same_index = [["embedding.Space", "retrieval.Space"]]
+
+[exports]
+run = "harness.run"
+close = "data.close"
+```
+
+The harness and retrieval module share one data node. Retrieval sees the cached embedding module. The chosen embedding-space identity propagates through the composition. This wiring is part of the built module, so the application supplies documents and queries without reconstructing the dependency graph.
+
+A model-backed knowledge agent extends the same architecture with a model contract and a harness that requires it. A general model contract can describe the operations the harness needs, while independent contributors supply providers, tool adapters, or execution strategies. The included example demonstrates the composition mechanism using lexical vectors and a Python executor; the transaction example below demonstrates value-level typing.
+
+### Extend behavior with mixins
+
+A cached embedding module requires `base: EMBEDDING` and provides `EMBEDDING`. Consumers bind to its enriched result. This allows caching to be contributed separately from both the encoder and its consumers.
+
+The same pattern can express retry, tracing, normalization, or authorization adapters. Order matters: retrying an entire ingestion operation can behave differently from retrying only its remote read. The module graph records the selected order and dependencies; satisfying the same interface does not imply equivalent behavior.
+
+The current builder supports **nonrecursive mixin linking** through explicit ports, partial publication, nesting, export merging, projection, and renaming. A named node is instantiated once per graph invocation; separate nodes invoke factories separately. Cycles and implicit rebinding of Python globals are unsupported. See [module composition](docs/module-build.md).
+
+### Check resource use inside a composition
+
+Graph wiring alone cannot establish that a transaction is consumed correctly. The `.mfl` language adds a small, separately checked operation language above ordinary Python providers.
+
+The real [transaction contract](families/transactions/interfaces.toml) declares a linear session:
+
+```text
+begin()                                  -> Session
+put(borrow Session, share Text, share Text) -> ()
+read(borrow Session, share Text)          -> Text
+commit(move Session)                     -> Text
+abort(move Session)                      -> ()
+```
+
+The [checked program](examples/typed/transaction.mfl) is:
+
+```python
+# .mfl: key and value are inputs declared by the public signature.
 session = store.begin()
 store.put(session, key, value)
 observed = store.read(session, key)
@@ -44,10 +224,11 @@ receipt = store.commit(session)
 return observed, receipt
 ```
 
-The compiler knows that the two middle calls borrow `session`, and that commit consumes it. Adding `store.read(session, key)` after commit produces **use after move**. Removing commit while returning `observed` produces **unconsumed linear resource**. These are build errors, even when no store implementation has been published.
+Reading after commit is a build error: the session has moved. Returning without consuming the session is also a build error. Neither rejection needs a concrete SQLite provider to exist.
+
+The declaration that enables this is ordinary TOML. This excerpt names an opaque value type and a consuming operation:
 
 ```toml
-# Excerpt from the interface's typing declaration
 [interfaces.typing.types]
 Session = { id = "transactions.sqlite.session@1", usage = "linear", representation = "opaque" }
 Text = { id = "python.str", usage = "shared", representation = "str" }
@@ -56,99 +237,17 @@ Text = { id = "python.str", usage = "shared", representation = "str" }
 commit = { parameters = { session = { type = "Session", mode = "move" } }, returns = ["Text"], effects = ["sqlite"] }
 ```
 
-Local type names are aliases; the `id` defines nominal equality. `opaque` keeps representation outside the checked language. It does not prevent reflection by arbitrary Python. Different nominal identities remain incompatible even if both implementations use dictionaries internally.
+Shared values may be reused or ignored. Affine owners may be transferred at most once and may be discarded. Linear owners must be transferred exactly once on each normally returning path, including by returning ownership to the caller. A borrow lends access for one synchronous operation and does not consume ownership; it need not be read-only.
 
-The three usage rules are:
+The compiler checks each terminal branch and unions the declared effects of its calls. Generated runtime guards also reject stale handles and incompatible values. Python operation implementations remain trusted, including their effect declarations, ownership promises, and failure cleanup. The checker does not prove cleanup after exceptions, termination, or exactly-once external effects.
 
-- **Shared:** values may be reused or ignored.
-- **Affine:** ownership may be transferred at most once; ignoring it or calling `discard(value)` is permitted.
-- **Linear:** ownership must be transferred exactly once on every normally returning path, either into another operation or out through the return value. Temporary borrows do not consume ownership.
+Ordinary Python implements the operations; `.mfl` expresses their checked composition. See the [language and typing rules](docs/checked-language.md) for the supported grammar and ownership model.
 
-Branches are checked independently. This is accepted when `keep` is a declared Boolean:
+## Synthesize a program from a goal
 
-```python
-# .mfl fragment
-session = store.begin()
-if keep:
-    receipt = store.commit(session)
-    return receipt
-else:
-    store.abort(session)
-    return "aborted"
-```
+The objective is to automatically select and compose modules according to what they provide and require. The current implementation does this by searching **published module constructors and their requirements**.
 
-Both paths discharge the same resource obligation. A branch that simply forgets the session is rejected. Effects are inferred from called operation contracts and checked against the result contract and optional policy. A `sqlite` effect cannot fit an empty effect bound. This does not inspect Python bodies for hidden effects.
-
-## Run the separately checked example
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -e '.[dev]'
-.venv/bin/python examples/typed_system.py --work-dir .mf/typed-example
-```
-
-Use an empty directory. The script publishes interfaces, checks and builds the program **before any store provider exists**, verifies two rejected programs, then publishes a real SQLite adapter. Synthesis fills the open `store` port; environment locking installs the program and replays it offline. The result is `["module systems", "committed"]`.
-
-The compiler is also available directly against that prepared repository:
-
-```bash
-.venv/bin/mf check-program examples/typed/transaction.toml \
-  --registry .mf/typed-example/repository --out .mf/type-report.json
-.venv/bin/mf build-program examples/typed/transaction.toml \
-  --registry .mf/typed-example/repository --out .mf/typed-build
-```
-
-Outputs include normal wheels, reviewable `generated.py`, `certificate.json` with the typed intermediate representation and checker result, and a `work-contract.json` for contributors. The certificate is a hash-bound checker report, not a machine-checked metatheoretic proof. Published programs remain ordinary module constructors and participate in existing graph composition and synthesis.
-
-Runtime ownership guards additionally reject stale handles, incompatible nominal/primitive values, and conflicting moves. Nested checked programs preserve ownership when calling one another. **The guarantee ends at trusted Python operation implementations:** an adapter must honor its contract, return fresh ownership where promised, and manage its own failure cleanup. Normal-path linearity does not prove cleanup after exceptions, termination, or exactly-once external effects. Borrow scopes currently last for one synchronous operation call.
-
-See the [checked-language guide](docs/checked-language.md) for the grammar, typing rules, trust boundary, and current limits. There is no general Python body checker, inferred lifetime system, generative abstract-type calculus, or numerical budget solver in this release.
-
-## Whole systems, open modules, and agent contributions
-
-For a knowledge system using Mari, retrieval algorithms may require an embedding module, a data layer, and an agent harness that itself requires a model contract. Those requirements should be module ports. The build selects providers, checks their relationships, and generates the Python wiring. An application imports the resulting system and supplies runtime inputs such as credentials and request data. Provider selection belongs to the build; service connections and execution belong to runtime.
-
-An **open module** is a reusable fragment with exports and unfilled requirements. Link several fragments, publish the resulting subsystem with its remaining requirements, then close it in a later build. Nonrecursive mixins contribute operations through explicit dependency ports. The builder checks wiring, projections, renames, and initialization order. Python implementations use their supplied dependency objects; arbitrary globals are not automatically rebound.
-
-Three different relationships matter: shared Python types, shared semantic identities such as an embedding space, and shared runtime instances such as a transaction context. Two embedding providers returning equal-sized arrays need not be compatible with the same index. Two modules using the same database driver need not share state. The intended build language makes these relationships explicit.
-
-| Feature | Current status and direction |
-| --- | --- |
-| Published interfaces and named constructors | Implemented; constructors receive selected dependency modules. |
-| Goal-directed composition | Bounded constructor synthesis plus provider selection for authored graphs; published open graphs participate in synthesis. |
-| Shared types, indices, and instances | Nominal type checks, declared semantic-index constraints, and shared named graph nodes. |
-| Open fragments and mixins | Nonrecursive partial linking, renaming, projection, and explicit dependency binding implemented. |
-| Fixed generated Python wiring | Compiled wheels contain fixed imports and calls; runtime checks perform no selection. |
-| Independent agent work contracts | Public/port contract slices and Protocol stubs generated; behavior still needs independent evidence. |
-
-TOML is the build DSL. The [module build guide](docs/module-build.md) documents the implemented grammar, constraints, generated artifacts, and execution semantics. The earlier [whole-system design](docs/build-time-module-composition.md) records the research direction; recursive modules, general lifecycle elaboration, and synthesis of arbitrary graph topology remain future work.
-
-## Build a real composed system
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -e '.[dev]'
-.venv/bin/python examples/knowledge_system.py --work-dir .mf/knowledge
-```
-
-Use an empty work directory. The example publishes Mari's unchanged MMR algorithm and small bindings to scikit-learn, SQLite, and Python's executor. It compiles an [open retrieval module](examples/modules/retrieval.toml), publishes it, and then builds a [complete system](examples/modules/knowledge.toml) with a cached embedding mixin and one shared data node. Finally it synthesizes a goal, locks and installs the complete environment, and executes two queries offline. The expected first hits are `dogs` and `python`.
-
-This exercises real lexical vectorization and storage. The executor is a bounded execution harness; an LLM model/harness integration is not included. See [candidate provenance](adaptations/knowledge/README.md) and [offline wheelhouse instructions](docs/module-build.md#run-the-real-candidate-system).
-
-The build commands are also directly available once providers are published:
-
-```bash
-.venv/bin/mf resolve-module examples/modules/retrieval.toml \
-  --registry .mf/knowledge/repository
-.venv/bin/mf build-module examples/modules/retrieval.toml \
-  --registry .mf/knowledge/repository --out .mf/retrieval-build
-.venv/bin/mf publish .mf/retrieval-build/index.json \
-  --registry .mf/knowledge/repository
-```
-
-A build emits a publication index and wheels, reviewable `generated.py`, `contract.pyi`, a bounded `work-contract.json`, and build provenance. Compiled open graphs are ordinary published constructors, so they can be nested, contributed by independent publishers, and closed by the existing synthesizer. Ambiguous or incomplete resolution requires an explicit choice.
-
-## Start with a goal
+A goal from the included iterator example is:
 
 ```toml
 schema_version = 1
@@ -162,59 +261,99 @@ capabilities = ["deduplicate", "batch"]
 allowed_effects = ["caller-iteration"]
 ```
 
-The repository contains a plain batching constructor and a deduplicating batching constructor. The synthesizer selects a suitable constructor, then finds implementations of its `chunker` and `deduplicator` requirements. The goal names neither the constructor nor a Python library.
+The goal names no library. The synthesizer finds a constructor providing the result interface, then recursively fills its chunker and deduplicator requirements with compatible providers. Published open graphs and checked programs participate as constructors too.
 
-The real example uses preserved source from **more-itertools 11.1.0**, **boltons 25.0.0**, and the copied **Mari** project. More-itertools initially supplies one complete program. Publishing Boltons into the existing iterator family expands the choices to four compositions; the earlier program still replays. All four return `[[3, 1], [2, 4]]` for the records `[3, 1, 3, 2, 1, 4]` with batch size two. A separate freshness goal discovers Mari's recency algorithm and returns `0.5` for one exponential half-life.
+The real example adapts more-itertools and boltons. Publishing another provider into the existing family expands the available compositions without rewriting the workflow. Earlier locked programs continue to select their original artifacts.
 
-## Run the real example
+This is bounded constructor synthesis, not arbitrary algorithm invention. Graph builds select providers for authored topology; synthesis can nest published constructors. Capability labels guide selection but do not prove behavioral laws; aggregating a dependency's labels does not prove that its parent exposes the claimed behavior. Multiple valid compositions remain an explicit choice; search limits remain visible. See [synthesis semantics](docs/synthesis.md).
+
+## Run the examples
 
 Python 3.11 or later:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e '.[dev]'
-.venv/bin/python scripts/prepare_candidates.py
-.venv/bin/python examples/real_world.py --work-dir .mf/demo
 ```
 
-Use an empty work directory. The example builds and publishes independent contributions, synthesizes and executes every valid iterator composition, verifies the older program still works after publication, and runs the Mari goal. It writes the repository, wheels, solutions, program locks, and `report.json` below that directory. It does not import the original packages to execute the generated programs.
+Each example needs an empty work directory. Environment locking may download third-party wheels; execution then uses the installed, locked environment.
 
-The same path is available through the CLI:
+**Knowledge retrieval:** build and publish an open retrieval subsystem, compose the full system, synthesize a goal, and execute two queries offline.
+
+```bash
+.venv/bin/python examples/knowledge_system.py --work-dir .mf/knowledge
+```
+
+Expected first hits: `dogs` and `python`. See [candidate provenance](adaptations/knowledge/README.md) and [offline wheelhouse preparation](docs/module-build.md#run-the-real-candidate-system).
+
+**Separate checking and ownership:** publish interfaces, check the program before any store provider exists, reject two invalid programs, then publish SQLite and synthesize the executable composition.
+
+```bash
+.venv/bin/python examples/typed_system.py --work-dir .mf/typed
+```
+
+Expected result: `["module systems", "committed"]`. Its rejected examples demonstrate use after move and an unconsumed linear resource.
+
+**Independent contributions and incremental selection:** prepare preserved upstream projections, publish alternative providers, and run the resulting iterator compositions and a Mari freshness goal.
+
+```bash
+.venv/bin/python scripts/prepare_candidates.py
+.venv/bin/python examples/real_world.py --work-dir .mf/iterators
+```
+
+The iterator compositions return `[[3, 1], [2, 4]]` for `[3, 1, 3, 2, 1, 4]` with batch size two. See [adaptation provenance](adaptations/README.md).
+
+### Build and publish directly
+
+After the knowledge example has prepared its repository:
+
+```bash
+.venv/bin/mf resolve-module examples/modules/retrieval.toml \
+  --registry .mf/knowledge/repository
+.venv/bin/mf build-module examples/modules/retrieval.toml \
+  --registry .mf/knowledge/repository --out .mf/retrieval-build
+.venv/bin/mf publish .mf/retrieval-build/index.json \
+  --registry .mf/knowledge/repository
+```
+
+After the typed example has prepared its repository:
+
+```bash
+.venv/bin/mf check-program examples/typed/transaction.toml \
+  --registry .mf/typed/repository --out .mf/type-report.json
+.venv/bin/mf build-program examples/typed/transaction.toml \
+  --registry .mf/typed/repository --out .mf/typed-build
+```
+
+Both builders emit normal publication indexes and wheels, reviewable generated Python, and contributor work contracts. Graph builds also emit Protocol stubs and graph provenance. Checked builds emit `certificate.json`: a hash-bound checker report and typed intermediate representation, not a machine-checked metatheoretic proof.
+
+### Select and lock the complete executable
+
+After the iterator example:
 
 ```bash
 .venv/bin/mf synthesize examples/goals/deduplicate-and-batch.toml \
-  --registry .mf/demo/repository --out .mf/solutions.json
+  --registry .mf/iterators/repository --out .mf/solutions.json
 .venv/bin/mf lock-assembly .mf/solutions.json --choice 0 \
-  --registry .mf/demo/repository --out .mf/program.lock.json
-.venv/bin/mf execute .mf/program.lock.json \
-  --registry .mf/demo/repository --export run --args '[[3,1,3,2,1,4],2]'
-```
-
-Ambiguity is explicit: `--choice` records which program was selected. A goal can request `[preferences] selection = "min_artifacts"` to rank by its exact artifact closure; ties remain choices. Search depth, candidate, state, and solution limits are recorded. Exhausting a limit never silently certifies a unique program.
-
-## Lock the complete environment
-
-`lock-env` resolves ordinary third-party wheel dependencies and includes the execution runtime. `sync` verifies the pinned interpreter and wheel hashes, installs without network access, and checks the resulting dependencies. `exec` runs the program in that environment without contacting the repository.
-
-```bash
+  --registry .mf/iterators/repository --out .mf/program.lock.json
 .venv/bin/mf lock-env .mf/program.lock.json \
-  --registry .mf/demo/repository --out .mf/environment
+  --registry .mf/iterators/repository --out .mf/environment
 .venv/bin/mf sync .mf/environment/environment.lock.json --target .mf/program-python
 .venv/bin/mf exec .mf/environment/environment.lock.json \
   --target .mf/program-python --export run --args '[[3,1,3,2,1,4],2]'
 ```
 
-To reproduce the example with fully offline resolution as well, first download its external runtime dependency, then use a fresh directory:
+The program lock fixes the chosen composition. The environment lock includes ordinary third-party wheel dependencies and the execution runtime. Synchronization verifies interpreter constraints and wheel hashes, installs offline, and checks dependencies. Execution needs no repository connection. Environment resolution uses pip and permits wheels only.
 
-```bash
-.venv/bin/pip download --only-binary=:all: --no-deps packaging==26.3 -d .mf/wheelhouse
-.venv/bin/python examples/real_world.py --work-dir .mf/offline-demo \
-  --offline-environment --wheelhouse .mf/wheelhouse
-```
+Atomic import exposes the resulting module binding only after preparation and linking succeed. It cannot roll back arbitrary Python import or initialization effects. See [contracts](docs/contracts.md) and [environment operations](docs/build-system.md).
 
-## Contribute to an existing family
+## Adapt existing Python and contribute smaller units
 
-A contribution declares the existing family header and its own publisher identity:
+Mari is a migration candidate, not the definition of the module system. Its copy under [projects/mari-kit](projects/mari-kit) supplies existing algorithms. Independent examples use other libraries and ordinary Python adapters.
+
+The build discovers supported source definitions, derives reachable dependencies, and emits selected member wheels plus shared source cells. Shared cells preserve common implementation and nominal Python type identity. Consumers can select one algorithm without installing every unrelated algorithm in the source project.
+
+A contribution manifest can stay small even when its source inventory is large:
 
 ```toml
 schema_version = 1
@@ -238,42 +377,30 @@ public = true
 include = ["members/**/*.toml"]
 ```
 
-A local member `temporal.decay` is published as `alice.temporal.decay`. Contributor fragments add interfaces, capability declarations, version overrides, and module requirements without editing an expanded global inventory. For an existing family, copy its exact header and context from repository metadata; each publisher maintains its own contribution manifest. See the [independent iterator contributions](families/iterators/README.md).
+This is an illustrative manifest for a source project named `alice_ranking`. For an existing family, use its exact immutable header and context. Contributor fragments add member-specific interfaces, capabilities, requirements, and versions without editing a generated global inventory.
 
 ```bash
 .venv/bin/mf init path/to/project --package alice_ranking \
   --family ranking --publisher alice --out families/ranking/family.toml
-.venv/bin/mf plan-build families/ranking/family.toml --member alice.temporal.decay
-.venv/bin/mf build families/ranking/family.toml --member alice.temporal.decay
+.venv/bin/mf plan-build families/ranking/family.toml --member alice.temporal_decay
+.venv/bin/mf build families/ranking/family.toml --member alice.temporal_decay \
+  --out dist/ranking
 ```
 
-The compiler derives shared source dependencies, keeps common nominal Python types in shared cells, and emits ordinary wheels for selected members and their reachable implementation dependencies. Multiple source roots, grouped exports, interface-only publications, per-member versions, and persistent analysis caching are supported. The cache is coarse: an analysis input change triggers reanalysis, while unchanged selected wheels retain their exact bytes.
+The commands assume that project actually defines the selected member. Multiple source roots, grouped exports, interface-only publications, and per-member versions are supported. Analysis caching is currently coarse: changed inputs trigger source reanalysis, while unchanged selected artifacts retain their bytes.
 
-## Module constructors and mixins
+Extraction has limits. Dynamic or otherwise unsupported Python requires an explicit adaptation; the tool does not claim to turn every library into sound independent modules automatically. Adapters expose dependency ports where existing code does not already have them. See the [build guide](docs/build-system.md), [migration evidence](docs/migration-validation.md), and [independent iterator contributions](families/iterators/README.md).
 
-A constructor declares the interfaces it needs and the interface it produces. Its Python factory receives the selected modules by name and returns the exports of the composed module. For example, the existing workflow contribution contains:
+## Run a shared repository
 
-```toml
-[[members]]
-id = "deduplicated_batches"
-kind = "functor"
-symbol = "module_workflows.iterables:deduplicated_batches"
-provides = { id = "workflows.batch_pipeline", version = "1" }
-requires = { chunker = { id = "iterators.chunker", version = "1" }, deduplicator = { id = "iterators.unique", version = "1" } }
-capabilities = ["deduplicate", "batch"]
-effects = ["dependency-effects"]
-```
-
-Named requirements, same-interface wrappers such as retry, grouped exports, shared type libraries, and order-sensitive constructor composition are implemented. **Nonrecursive module mixin linking is now implemented through `build-module`.** Its TOML graph connects requirements, merges exports explicitly, and lowers the result to a normal constructor. A named node is instantiated once per graph invocation; separate nodes invoke factories separately. Recursive hole filling and implicit rebinding of existing Python globals remain unsupported. See the [module build guide](docs/module-build.md), [updated mixin handoff](docs/mixins-handoff.md), [contract guide](docs/contracts.md), and [synthesis guide](docs/synthesis.md).
-
-## Serve the repository
+The local and HTTP repositories use the same publication and selection model. This local development example authorizes two independent publishers:
 
 ```bash
 export MF_PUBLISHERS='{"alice-local-token":{"publisher":"alice"},"bob-local-token":{"publisher":"bob"}}'
 .venv/bin/mf serve --registry .mf/repository --port 8042
 ```
 
-From another shell:
+From another shell, after building Alice's contribution:
 
 ```bash
 export MF_TOKEN='alice-local-token'
@@ -281,14 +408,37 @@ export MF_TOKEN='alice-local-token'
 .venv/bin/mf interfaces --registry http://127.0.0.1:8042
 ```
 
-Read access is public; publication tokens identify publishers. By default Alice and Bob can contribute their own members to any family. Optional token family restrictions narrow that permission. Existing family headers and releases are immutable. Interface IDs and wheel distribution names have publisher ownership; exact existing shared artifacts can be reused. The HTTP client verifies selected metadata and content-addressed objects. See the [repository API and operation guide](docs/repository.md).
+Reads are public. Publication tokens identify publishers; optional family restrictions narrow where a publisher may contribute. Family headers and releases are immutable. Interface IDs and wheel distribution names have publisher ownership, while exact existing shared artifacts may be reused. The client verifies selected metadata and content-addressed objects.
 
-## Research and practical boundaries
+Repository discovery uses SQLite/FTS5 metadata and a content-addressed artifact store. Resolution can inspect metadata before fetching the selected artifact closure. See the [repository protocol and operations](docs/repository.md).
 
-The [research proposal](docs/RESEARCH.md), [module theory review](docs/research-theory.md), [distribution review](docs/research-distribution.md), and [build-system review](docs/research-build-systems.md) develop the basis in ML signatures, functors, sharing constraints, Backpack, family polymorphism, and modern build systems. The [synthesis guide](docs/synthesis.md) distinguishes the implemented search calculus from the larger research direction.
+## Research direction and implementation status
 
-This implementation synthesizes compositions of published modules and constructors. It does not invent arbitrary Python algorithms or prove capability claims. Interface call shapes are checked at linking; shared type identities are enforced; effects and behavioral laws remain declared obligations. Atomic import withholds the resulting binding until preparation and linking succeed, but cannot roll back arbitrary Python effects. Unsupported Python source requires an explicit, reviewed adaptation; the iterator projections preserve selected upstream definitions and record omissions and hashes.
+The project draws on ML signatures, functors, abstract types, and sharing; module families and mixin composition; and separate checking above an existing implementation language. [Backpack](https://people.mpi-sws.org/~dreyer/papers/backpack/paper.pdf) is an important precedent for the latter. [Linear Haskell](https://arxiv.org/abs/1710.09756) informs the interest in combining unrestricted values with ownership-sensitive composition. This implementation uses a smaller calculus and does not inherit those systems' soundness results.
 
-The service is a working single-node repository. Internet-scale throughput, distributed trust, general higher-order module typing, recursive linking, automatic resource lifecycle management, and autonomous adapter generation remain unvalidated research work. Semantic indices enforce agreement on declarations, not the truth of an embedding or storage claim. Measurements for thousands of definitions concern local discovery and builds, not a claim of operating a global ecosystem.
+The research direction is a software ecosystem where an agent can begin with a desired system, find its missing contracts, delegate those contracts to other agents, and assemble the resulting contributions. Richer module types, reusable protocols, evaluation-backed selection, and distributed publication are the foundations for that ecosystem.
 
-Run validation with `.venv/bin/pytest -q` and `.venv/bin/ruff check src tests scripts examples`. See [validation](docs/VALIDATION.md), [real candidate provenance](adaptations/README.md), and [build guide](docs/build-system.md).
+Version 0.4.0 implements the build and repository core, nonrecursive open module composition, bounded constructor synthesis, and a restricted typed language. Million-agent coordination is the target architecture; the current repository is single-node and does not provide agent scheduling or federation. Python providers remain trusted. Full generative module typing, arbitrary program synthesis, and automatic lifecycle reasoning remain research work.
+
+Local scale measurements include 10,000 definitions across 1,000 contribution files with a 21-line root TOML, and a copied Mari workload with 988 public definitions. These measure compact authoring and selective builds, rather than concurrent agent capacity.
+
+The 0.4.0 validation records **392 tests and 32 subtests passing**, plus lint, wheel construction, and the SQLite publication-to-offline-execution example. Historical reports cover the composed knowledge system, copied Mari migration, and local source-scale workloads. These are separate measurements with their scopes recorded in [validation](docs/VALIDATION.md).
+
+```bash
+.venv/bin/pytest -q
+.venv/bin/ruff check src tests scripts examples
+.venv/bin/python -m build --wheel
+```
+
+| Read next | What it covers |
+| --- | --- |
+| [Research proposal](docs/RESEARCH.md) | Hypotheses and broader research agenda. |
+| [Module theory](docs/research-theory.md) | Signatures, functors, sharing, families, and composition foundations. |
+| [Distribution research](docs/research-distribution.md) | Software publication and ecosystem scale. |
+| [Build-system research](docs/research-build-systems.md) | Adaptation, dependency extraction, and incremental builds. |
+| [Module graph guide](docs/module-build.md) | Open modules, mixins, sharing constraints, generated wiring, and limits. |
+| [Checked-language guide](docs/checked-language.md) | Grammar, nominal types, resource rules, effects, and the trusted Python boundary. |
+| [Synthesis guide](docs/synthesis.md) | Constructor search, ambiguity, policies, and program locks. |
+| [Repository guide](docs/repository.md) | Publication, authentication, and artifact retrieval. |
+
+Licensed under [Apache-2.0](LICENSE).
