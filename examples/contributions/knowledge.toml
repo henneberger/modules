@@ -1,0 +1,28 @@
+schema_version = 1
+
+[task]
+id = "knowledge-batch-retrieval"
+summary = "Compose batch retrieval that returns source document identities and text from the supplied corpus"
+requires = { id = "knowledge.system", version = "1" }
+capabilities = ["batch-retrieval", "diversified-retrieval", "cached-embeddings"]
+
+[policy]
+allowed_effects = ["caller-iteration", "memory", "threads"]
+
+[[cases]]
+id = "preserve-source-identity"
+export = "run"
+args = [{"manual:42" = "dogs"}, ["dogs"], 1]
+expected = [[{id = "manual:42", text = "dogs", relevance = 1.0}]]
+
+[[cases]]
+id = "independent-queries-share-corpus"
+export = "run"
+args = [{"docs:dogs" = "dogs", "docs:python" = "python"}, ["dogs", "python"], 1]
+expected = [[{id = "docs:dogs", text = "dogs", relevance = 1.0}], [{id = "docs:python", text = "python", relevance = 1.0}]]
+
+[[cases]]
+id = "empty-corpus"
+export = "run"
+args = [{}, ["missing"], 1]
+expected = [[]]

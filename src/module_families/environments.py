@@ -9,6 +9,7 @@ import hashlib
 import importlib.metadata
 import io
 import json
+import math
 import os
 import shutil
 import stat
@@ -485,10 +486,15 @@ def run_environment(
     export: str,
     args: list | None = None,
     kwargs: dict | None = None,
+    timeout: float | None = None,
 ) -> dict:
     """Execute through the locked runtime in a separately installed interpreter."""
     if not isinstance(export, str) or not export.isidentifier():
         raise EnvironmentError("export must be a Python identifier")
+    if timeout is not None and (
+        type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0
+    ):
+        raise EnvironmentError("timeout must be finite positive seconds")
     if args is not None and not isinstance(args, list):
         raise EnvironmentError("args must be a list")
     if kwargs is not None and (
@@ -517,6 +523,7 @@ def run_environment(
         ],
         capture_output=True,
         text=True,
+        timeout=timeout,
     )
     if process.returncode:
         raise EnvironmentError(

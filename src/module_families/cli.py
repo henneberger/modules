@@ -216,6 +216,32 @@ def parser() -> argparse.ArgumentParser:
     synthesize.add_argument("--max-depth", type=int, default=5)
     synthesize.add_argument("--max-states", type=int, default=10000)
     synthesize.add_argument("--max-solutions", type=int, default=16)
+    contribution_plan = sub.add_parser("plan-contributions", help="Turn missing providers into bounded contribution handoffs")
+    contribution_plan.add_argument("goal")
+    contribution_plan.add_argument("--out", required=True)
+    contribution_plan.add_argument("--max-depth", type=int, default=5)
+    contribution_plan.add_argument("--max-states", type=int, default=10000)
+    contribution_plan.add_argument("--max-candidates", type=int, default=100)
+    contribution_plan.add_argument("--max-solutions", type=int, default=16)
+    contribution_prepare = sub.add_parser("prepare-contribution", help="Package a TOML acceptance contract with its published interface")
+    contribution_prepare.add_argument("contract")
+    contribution_prepare.add_argument("--out", required=True)
+    contribution_evaluate = sub.add_parser("evaluate-contribution", help="Evaluate a locked candidate against an executable task")
+    contribution_evaluate.add_argument("task")
+    contribution_evaluate.add_argument("environment")
+    contribution_evaluate.add_argument("--target", required=True)
+    contribution_evaluate.add_argument("--timeout", type=float, default=30)
+    contribution_evaluate.add_argument("--out", required=True)
+    contribution_verify = sub.add_parser("verify-evidence", help="Verify contribution evidence and its exact artifact provenance")
+    contribution_verify.add_argument("task")
+    contribution_verify.add_argument("environment")
+    contribution_verify.add_argument("evidence")
+    contribution_accept = sub.add_parser("accept-contribution", help="Publish exactly the contribution covered by passing trusted evaluation evidence")
+    contribution_accept.add_argument("task")
+    contribution_accept.add_argument("environment")
+    contribution_accept.add_argument("evidence")
+    contribution_accept.add_argument("index")
+    contribution_accept.add_argument("--out")
     assembly_lock = sub.add_parser(
         "lock-assembly",
         help="Pin a selected synthesized or resolved program and its interfaces",
@@ -287,6 +313,9 @@ def parser() -> argparse.ArgumentParser:
         program_check,
         program_build,
         synthesize,
+        contribution_plan,
+        contribution_prepare,
+        contribution_accept,
         assembly_lock,
         execute,
         lock_env,
@@ -403,6 +432,17 @@ def main(argv: list[str] | None = None) -> int:
             from .adaptation import adapt
 
             _emit(adapt(Path(args.manifest), Path(args.out)))
+        elif args.command == "evaluate-contribution":
+            from .contributions import evaluate_contribution
+
+            result = evaluate_contribution(args.task, args.environment, args.target, timeout=args.timeout)
+            _emit(result, args.out)
+            if result["status"] != "passed":
+                return 2
+        elif args.command == "verify-evidence":
+            from .contributions import verify_evidence
+
+            _emit(verify_evidence(args.task, args.environment, args.evidence))
         elif args.command == "sync":
             from .environments import sync_environment
 
@@ -451,7 +491,21 @@ def main(argv: list[str] | None = None) -> int:
                 token=os.environ.get(args.token_env),
                 cache=Path(args.cache),
             )
-            if args.command == "publish":
+            if args.command == "prepare-contribution":
+                from .contributions import prepare_contribution
+
+                _emit(prepare_contribution(args.contract, registry, args.out))
+            elif args.command == "plan-contributions":
+                from .handoffs import plan_contributions
+
+                _emit(plan_contributions(args.goal, registry, args.out,
+                    max_depth=args.max_depth, max_states=args.max_states,
+                    max_candidates=args.max_candidates, max_solutions=args.max_solutions))
+            elif args.command == "accept-contribution":
+                from .acceptance import accept_contribution
+
+                _emit(accept_contribution(args.task, args.environment, args.evidence, args.index, registry), args.out)
+            elif args.command == "publish":
                 _emit(registry.publish(Path(args.index)))
             elif args.command == "families":
                 _emit(registry.families(limit=args.limit, offset=args.offset))

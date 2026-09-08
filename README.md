@@ -267,6 +267,20 @@ The real example adapts more-itertools and boltons. Publishing another provider 
 
 This is bounded constructor synthesis, not arbitrary algorithm invention. Graph builds select providers for authored topology; synthesis can nest published constructors. Capability labels guide selection but do not prove behavioral laws; aggregating a dependency's labels does not prove that its parent exposes the claimed behavior. Multiple valid compositions remain an explicit choice; search limits remain visible. See [synthesis semantics](docs/synthesis.md).
 
+## Close the contribution loop
+
+Version 0.5.0 makes a first part of the coordination model executable. A missing provider becomes a contribution draft; an integrator adds acceptance cases; a contributor builds a candidate in a staging repository; evaluation binds observations to the exact program and environment; an explicit acceptance command publishes the tested contribution.
+
+```bash
+.venv/bin/python examples/contribution_system.py --work-dir .mf/contribution-demo
+```
+
+Run this after installing the project as shown below. The example composes the existing knowledge-base providers twice. One candidate has compatible APIs but gives ingestion and retrieval different SQLite stores. Its behavioral cases fail, and publication through the acceptance command is rejected. The correctly shared candidate passes, is published, and fills the original synthesis goal.
+
+The task is a small TOML contract with an exact interface, declared capability/effect requirements, and explicit input/output cases. It is prepared before a complete system provider exists. Each case runs in a fresh locked worker process with a timeout. Evidence records the task, program, environment, and observations; it remains unsigned evidence from a trusted local evaluator.
+
+See the [contribution workflow](docs/contributions.md) for the contract grammar, CLI commands, evidence semantics, and working example. The [module calculus design](docs/module-calculus.md) specifies the next layer of abstract and associated types; those proposed rules are distinct from the current checker.
+
 ## Run the examples
 
 Python 3.11 or later:
@@ -418,11 +432,11 @@ The project draws on ML signatures, functors, abstract types, and sharing; modul
 
 The research direction is a software ecosystem where an agent can begin with a desired system, find its missing contracts, delegate those contracts to other agents, and assemble the resulting contributions. Richer module types, reusable protocols, evaluation-backed selection, and distributed publication are the foundations for that ecosystem.
 
-Version 0.4.0 implements the build and repository core, nonrecursive open module composition, bounded constructor synthesis, and a restricted typed language. Million-agent coordination is the target architecture; the current repository is single-node and does not provide agent scheduling or federation. Python providers remain trusted. Full generative module typing, arbitrary program synthesis, and automatic lifecycle reasoning remain research work.
+Version 0.5.0 implements the build and repository core, nonrecursive open module composition, bounded constructor synthesis, a restricted typed language, and executable contribution contracts with local evaluation and explicit acceptance. Million-agent coordination is the target architecture; the current repository is single-node and does not provide agent scheduling or federation. Python providers remain trusted. Full generative module typing, arbitrary program synthesis, and automatic lifecycle reasoning remain research work.
 
 Local scale measurements include 10,000 definitions across 1,000 contribution files with a 21-line root TOML, and a copied Mari workload with 988 public definitions. These measure compact authoring and selective builds, rather than concurrent agent capacity.
 
-The 0.4.0 validation records **392 tests and 32 subtests passing**, plus lint, wheel construction, and the SQLite publication-to-offline-execution example. Historical reports cover the composed knowledge system, copied Mari migration, and local source-scale workloads. These are separate measurements with their scopes recorded in [validation](docs/VALIDATION.md).
+The 0.5.0 validation records **466 tests and 32 subtests passing**, plus lint, wheel construction, and the knowledge-base contribution loop. The 0.4.0 report retains the SQLite publication-to-offline-execution evidence. Historical reports cover the composed knowledge system, copied Mari migration, and local source-scale workloads. These are separate measurements with their scopes recorded in [validation](docs/VALIDATION.md).
 
 ```bash
 .venv/bin/pytest -q
@@ -438,6 +452,8 @@ The 0.4.0 validation records **392 tests and 32 subtests passing**, plus lint, w
 | [Build-system research](docs/research-build-systems.md) | Adaptation, dependency extraction, and incremental builds. |
 | [Module graph guide](docs/module-build.md) | Open modules, mixins, sharing constraints, generated wiring, and limits. |
 | [Checked-language guide](docs/checked-language.md) | Grammar, nominal types, resource rules, effects, and the trusted Python boundary. |
+| [Contribution workflow](docs/contributions.md) | Missing requirements, task contracts, evaluation, and accepted publication. |
+| [Module calculus design](docs/module-calculus.md) | Proposed associated types, sharing rules, and implementation milestones. |
 | [Synthesis guide](docs/synthesis.md) | Constructor search, ambiguity, policies, and program locks. |
 | [Repository guide](docs/repository.md) | Publication, authentication, and artifact retrieval. |
 

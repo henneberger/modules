@@ -1,0 +1,117 @@
+{
+  "format": "module-families-contribution-example-1",
+  "task_sha256": "6e9a5c5b454495f92877353f188c89a7d3e4563e3e57e6f9da0a6cabf30c81d3",
+  "initial_status": "needs-contributions",
+  "candidates": {
+    "miswired": {
+      "evidence": ".mf/contribution-release/candidates/miswired/evidence.json",
+      "status": "failed",
+      "cases": [
+        {
+          "id": "preserve-source-identity",
+          "actual": [
+            []
+          ],
+          "status": "failed"
+        },
+        {
+          "id": "independent-queries-share-corpus",
+          "actual": [
+            [],
+            []
+          ],
+          "status": "failed"
+        },
+        {
+          "id": "empty-corpus",
+          "actual": [
+            []
+          ],
+          "status": "passed"
+        }
+      ],
+      "rejection": "evidence provenance or acceptance mismatch"
+    },
+    "integrator": {
+      "evidence": ".mf/contribution-release/candidates/integrator/evidence.json",
+      "status": "passed",
+      "cases": [
+        {
+          "id": "preserve-source-identity",
+          "actual": [
+            [
+              {
+                "id": "manual:42",
+                "text": "dogs",
+                "relevance": 1.0
+              }
+            ]
+          ],
+          "status": "passed"
+        },
+        {
+          "id": "independent-queries-share-corpus",
+          "actual": [
+            [
+              {
+                "id": "docs:dogs",
+                "text": "dogs",
+                "relevance": 1.0
+              }
+            ],
+            [
+              {
+                "id": "docs:python",
+                "text": "python",
+                "relevance": 1.0
+              }
+            ]
+          ],
+          "status": "passed"
+        },
+        {
+          "id": "empty-corpus",
+          "actual": [
+            []
+          ],
+          "status": "passed"
+        }
+      ],
+      "acceptance": {
+        "format": "module-families-accepted-contribution-1",
+        "evidence_sha256": "edb66b7ab5b66a3c37b44a20ed4184c17faeaca5a6e0229e47181b2747aecac6",
+        "environment_sha256": "f856847fa87f62c68d056d839186ca2f4cafb91b8a14898ec91c75fe28a0b4ab",
+        "program_sha256": "b3bc50466721ac58c95d879162634d7f854757fe459242034fc91b9a0d4362dd",
+        "member": "integrator.system",
+        "publication": {
+          "family": "knowledge",
+          "version": "1.0.0",
+          "members": 1,
+          "added_members": 1,
+          "artifacts": 15,
+          "interfaces": 0,
+          "added_interfaces": 0,
+          "sha256": "69684bfb1dae2fc4913a4e23e387ede9212972bca4239c9866501717524ac8db",
+          "already_published": false
+        },
+        "trust": "unsigned evidence from caller-trusted evaluator; not a repository admission policy"
+      }
+    }
+  },
+  "final_status": "resolved",
+  "accepted_program_sha256": "b3bc50466721ac58c95d879162634d7f854757fe459242034fc91b9a0d4362dd",
+  "replay": {
+    "assembly": "b3bc50466721ac58c95d879162634d7f854757fe459242034fc91b9a0d4362dd",
+    "export": "run",
+    "result": [
+      [
+        {
+          "id": "guide:1",
+          "text": "modules",
+          "relevance": 1.0
+        }
+      ]
+    ]
+  },
+  "scope": "Two independently staged graph contributions using existing providers; local trusted evaluation, no autonomous agent scheduler."
+}

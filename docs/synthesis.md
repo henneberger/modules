@@ -41,3 +41,7 @@ The separate environment lock resolves external wheel dependencies, retains thei
 ML's signatures, structures, functors, and sharing equations provide the interface and composition vocabulary. Automatic capability selection is a search layer over that vocabulary, rather than a property obtained merely by adopting ML terminology. The implementation checks a deliberately smaller runtime-oriented language; it does not inherit the soundness proofs of ML, Backpack, or modern family-polymorphism calculi. See the cited [theory review](research-theory.md) and [research proposal](RESEARCH.md).
 
 Still open: richer structural and higher-order signatures, semantic refinements and proof-carrying evidence, parameterized abstract type families, globally consistent repository snapshots, stronger search optimization, and empirical measurement of agent-generated adaptations. These research questions are separate from the implemented build, publish, synthesize, lock, and execution path.
+
+## Missing requirements as contribution work
+
+`mf plan-contributions GOAL --registry REPOSITORY --out DIRECTORY` retains synthesis diagnostics and prepares authorable handoffs for observed missing providers with published interfaces. It does not turn search cutoffs into absence claims or invent behavioral acceptance cases. See the [executable contribution workflow](contributions.md).

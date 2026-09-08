@@ -1,0 +1,52 @@
+{
+  "date": "2026-09-08",
+  "version": "0.4.0",
+  "python": "3.14.6",
+  "repository_schema": 3,
+  "tests": {
+    "passed": 392,
+    "subtests_passed": 32,
+    "seconds": 12.86,
+    "command": ".venv/bin/pytest -q --tb=short"
+  },
+  "ruff": "passed: src tests scripts examples adaptations/knowledge adaptations/transactions",
+  "checked_language": {
+    "sha256": "ab9812b0b12713fd9e444a31239ad1b2607cdf1aa7cce1667a7e37e6329e77b8",
+    "effects": [
+      "sqlite"
+    ],
+    "guarantees": {
+      "nominal_value_types": true,
+      "normal_path_usage": true,
+      "lexical_call_borrows": true,
+      "declared_effect_bound": true,
+      "python_implementation_verified": false,
+      "exception_cleanup_verified": false
+    }
+  },
+  "real_candidate": {
+    "report": "typed-language-validation.json",
+    "command": ".venv/bin/python examples/typed_system.py --work-dir .mf/typed-release --wheelhouse .mf/upstream-wheels",
+    "separate_compilation_without_providers": true,
+    "offline_result": [
+      "module systems",
+      "committed"
+    ]
+  },
+  "release_wheel": {
+    "path": "dist/module-families/module_families-0.4.0-py3-none-any.whl",
+    "sha256": "bf3e3d9fe182eafa03f444f75790084623105deec17197568bc9a87a4d5c5204",
+    "built": true
+  },
+  "previous_measurements": {
+    "report": "final-validation-0.3.json",
+    "note": "Historical Mari/scikit-learn graph example and earlier scale measurements; not rerun for this language extension."
+  },
+  "limits": [
+    "Python operation implementations and their effect declarations remain trusted.",
+    "Linear accounting covers normal returns; exception cleanup and termination are not proven.",
+    "Borrows last one synchronous operation call.",
+    "Nominal opaque identities are explicit; generative abstract types and numerical budget solving are not implemented.",
+    "Synthesis selects published constructors; it does not invent arbitrary source programs."
+  ]
+}
