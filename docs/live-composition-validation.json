@@ -1,0 +1,31 @@
+{
+  "actual_agent_invocations": 1,
+  "attempts": [
+    {
+      "worker": "submitted",
+      "evaluation": "accepted"
+    }
+  ],
+  "synthesis": "unique",
+  "assembly_sha256": "6e7f4139316bd427f168a9f7eca0f7e72f85e31ef63a7ccfc304326cfd87efb9",
+  "attestation": {
+    "payload": {
+      "format": "module-families-evaluator-attestation-1",
+      "evaluator": "knowledge-ci",
+      "task_sha256": "6e9a5c5b454495f92877353f188c89a7d3e4563e3e57e6f9da0a6cabf30c81d3",
+      "environment_sha256": "fc3d3ef409b52cb0a5c2f0cc5af667f52aedd5231393d8437b51471037f76716",
+      "program_sha256": "ae7b28a01977c2798b7459a059f11a101e7d97c13db67a348e9aa1f114f0c730",
+      "evidence_sha256": "06509a39b2e659c8ecc4920fae29fc2a704b92be76c6a7febfd4e648ee9adc98",
+      "context_sha256": "8dbb2cce2e393f9ffc0b9f812f4794cb6f6fd98699d063a0ac3c55e6b77f7a2a",
+      "environment_fingerprint": "ffa16410802b25b5dae5c82e3f53ff6c1a3cdc426b5e6a9323e0fd8047f7d76e",
+      "status": "passed"
+    },
+    "signature": "de529b8af1dff94d70c4267e91efce99acf6c244dd2d60976acc8c338fe30cc8",
+    "sha256": "74af2988002e19aa4f427cab3444bae090d5ece120bdc8ff430b4bf8097b05d8"
+  },
+  "candidate_cards_shared": 6,
+  "guide_bytes": 11093,
+  "new_python_implementation": false,
+  "measurement": "One real local Codex authoring invocation composed six supplied published cards into a TOML knowledge system; independent local evaluator ran the original three knowledge cases.",
+  "scope": "Trusted local candidate execution; this is one successful task, not an agent-quality benchmark."
+}

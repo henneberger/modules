@@ -1,0 +1,31 @@
+schema_version = 1
+members = []
+
+[family]
+description = "Generic checked SQLite knowledge-base search"
+name = "typed-knowledge"
+version = "1.0.0"
+
+[publisher]
+name = "contracts"
+
+[[interfaces]]
+associated = { constructors = { "kb.PreparedQuery" = { parameters = ["identity"], result = "shared" }, "kb.SearchResults" = { parameters = ["shared"], result = "shared" } }, types = { QuerySyntax = "identity" } }
+callables = { prepare = { parameters = [{ kind = "POSITIONAL_OR_KEYWORD", name = "query", required = true }] } }
+id = "kb.generic.query"
+typing = { operations = { prepare = { effects = [], parameters = { query = { mode = "share", type = "Input" } }, returns = ["Output"] } }, types = { Input = { id = "python.str", representation = "str", usage = "shared" }, Output = { representation = "opaque", term = { apply = "kb.PreparedQuery", args = [{ kind = "identity", var = "QuerySyntax" }], kind = "shared" }, usage = "shared" } } }
+version = "1"
+
+[[interfaces]]
+associated = { constructors = { "kb.PreparedQuery" = { parameters = ["identity"], result = "shared" }, "kb.SearchResults" = { parameters = ["shared"], result = "shared" } }, types = { DocumentId = "shared", QuerySyntax = "identity" } }
+callables = { search = { parameters = [{ kind = "POSITIONAL_OR_KEYWORD", name = "prepared", required = true }] } }
+id = "kb.generic.index"
+typing = { operations = { search = { effects = ["sqlite"], parameters = { prepared = { mode = "share", type = "Input" } }, returns = ["Output"] } }, types = { Input = { representation = "opaque", term = { apply = "kb.PreparedQuery", args = [{ kind = "identity", var = "QuerySyntax" }], kind = "shared" }, usage = "shared" }, Output = { representation = "opaque", term = { apply = "kb.SearchResults", args = [{ kind = "shared", var = "DocumentId" }], kind = "shared" }, usage = "shared" } } }
+version = "1"
+
+[[interfaces]]
+associated = { constructors = { "kb.PreparedQuery" = { parameters = ["identity"], result = "shared" }, "kb.SearchResults" = { parameters = ["shared"], result = "shared" } }, types = { DocumentId = "shared" } }
+callables = { search = { parameters = [{ kind = "POSITIONAL_OR_KEYWORD", name = "query", required = true }] } }
+id = "kb.generic.search"
+typing = { operations = { search = { effects = ["sqlite"], parameters = { query = { mode = "share", type = "Input" } }, returns = ["Output"] } }, types = { Input = { id = "python.str", representation = "str", usage = "shared" }, Output = { representation = "opaque", term = { apply = "kb.SearchResults", args = [{ kind = "shared", var = "DocumentId" }], kind = "shared" }, usage = "shared" } } }
+version = "1"

@@ -8,6 +8,13 @@ This requires more than distributing smaller packages. We need to express what a
 
 The project combines a build system, a checked composition language, and a repository. Its central idea is that the structure of software can become the structure of collaboration: types describe the work, module requirements expose what is missing, and composition turns independent contributions into a running system.
 
+A [recorded working example](docs/live-composition-validation.json) gives one real
+coding agent six published component cards. It writes a
+[TOML knowledge system](examples/modules/agent-authored-knowledge.toml), using
+existing Python implementations, which passes evaluation and is selected by the
+build system. This demonstrates the central loop; million-agent operation remains
+the scaling target.
+
 ## The problem: building a knowledge base together
 
 Consider an enterprise knowledge base answering questions across product manuals, support tickets, internal documents, and source code. A useful system might need:
@@ -269,7 +276,7 @@ This is bounded constructor synthesis, not arbitrary algorithm invention. Graph 
 
 ## Associate types with the modules that define them
 
-Version 0.6.0 makes associated types and substitution executable in the graph builder. An embedding signature can declare an abstract `Space`; a provider supplies its concrete witness; a cache exports `base.Space`. A typed vector result can then be described as `VectorBatch[Space]`, rather than an unrelated array type.
+Associated types and substitution are executable in both the graph builder and checked `.mfl` operation bodies. An embedding signature can declare an abstract `Space`; a provider supplies its concrete witness; a cache exports `base.Space`. A typed vector result can then be described as `VectorBatch[Space]`, rather than an unrelated array type.
 
 An open module can require `query.Space = index.Space` without selecting either provider. Its published constructor carries that equation forward. When another graph supplies providers, substitution checks their witnesses and rejects distinct spaces—even if their arrays have identical dimensions. The same mechanism connects a retriever's document IDs to its data store's domain.
 
@@ -288,11 +295,11 @@ The [associated-type guide](docs/associated-types.md) explains the term language
 .venv/bin/python examples/associated_system.py --work-dir .mf/associated
 ```
 
-Run it after installing the project below. This increment checks associated types at graph boundaries. Substitution inside `.mfl` operation bodies and generated fresh type identities are subsequent language work.
+Run it after installing the project below. The checker also substitutes associated types inside `.mfl` calls and nested owned returns. Two ports remain distinct until an explicit sharing equation relates them: calling one from the other cannot silently manufacture equality. Generated fresh type identities remain language research.
 
 ## Close the contribution loop
 
-Version 0.5.0 makes a first part of the coordination model executable. A missing provider becomes a contribution draft; an integrator adds acceptance cases; a contributor builds a candidate in a staging repository; evaluation binds observations to the exact program and environment; an explicit acceptance command publishes the tested contribution.
+The contribution protocol makes the coordination model executable. A missing provider becomes a contribution draft; an integrator adds acceptance cases; a contributor builds a candidate in a staging repository; evaluation binds observations to the exact program and environment; an explicit acceptance command publishes the tested contribution.
 
 ```bash
 .venv/bin/python examples/contribution_system.py --work-dir .mf/contribution-demo
@@ -300,9 +307,71 @@ Version 0.5.0 makes a first part of the coordination model executable. A missing
 
 Run this after installing the project as shown below. The example composes the existing knowledge-base providers twice. One candidate has compatible APIs but gives ingestion and retrieval different SQLite stores. Its behavioral cases fail, and publication through the acceptance command is rejected. The correctly shared candidate passes, is published, and fills the original synthesis goal.
 
-The task is a small TOML contract with an exact interface, declared capability/effect requirements, and explicit input/output cases. It is prepared before a complete system provider exists. Each case runs in a fresh locked worker process with a timeout. Evidence records the task, program, environment, and observations; it remains unsigned evidence from a trusted local evaluator.
+The task is a small TOML contract with an exact interface, declared capability/effect requirements, and explicit input/output cases. It is prepared before a complete system provider exists. Each case runs in a fresh locked worker process with a timeout. Evidence records the task, program, environment, and observations. The integrated evaluator signs its own passing observations; evidence-aware synthesis then requires a trusted observation for the exact selected composition and executable environment.
 
-See the [contribution workflow](docs/contributions.md) for the contract grammar, CLI commands, evidence semantics, and working example. The [module calculus design](docs/module-calculus.md) specifies the next layer of abstract and associated types; those proposed rules are distinct from the current checker.
+See the [contribution workflow](docs/contributions.md) for the contract grammar, CLI commands, evidence semantics, and working example. The [module calculus design](docs/module-calculus.md) distinguishes implemented associated-type rules from remaining language research.
+
+## From a missing contract to agent-authored software
+
+An agent worker receives a small immutable task packet: the required signature,
+capabilities, effect policy, and acceptance cases. An operator-configured coding
+agent writes ordinary Python and a TOML manifest. The worker builds the artifact
+and publishes it to staging. A separately authorized evaluator resolves its
+accepted dependencies, builds a locked environment, runs the cases, signs passing
+observations, and admits the exact contribution to the repository.
+
+For a knowledge-ingestion team, the packet might ask for document chunking that
+preserves source identity. It need not include the search service, the billing
+service, or a checkout of every competing algorithm. The same protocol accepts
+an open graph or checked `.mfl` program, so an integration agent can contribute a
+composition rather than another implementation of its dependencies.
+
+```bash
+# Uses your authenticated local Codex CLI to compose existing providers in TOML.
+.venv/bin/python examples/agent_composition.py --work-dir .mf/agent-composition
+
+# Smaller task: adapt standard-library textwrap while preserving document IDs.
+.venv/bin/python examples/agent_contribution.py --work-dir .mf/agent-demo
+```
+
+The composition example supplies a bounded set of published contracts and cards.
+The agent writes the module graph; Mari ranking, scikit-learn embeddings, SQLite
+storage, and the query harness remain existing Python implementations. Evaluation
+checks the resulting knowledge system before publication.
+
+The [campaign coordinator](docs/campaigns.md) accepts a TOML task DAG and a final
+system goal. Tasks become eligible after their prerequisites are accepted; each
+agent has bounded attempts, leases, and evaluation feedback. The coordinator
+repeats contribution and evaluation rounds, then synthesizes and locks a unique
+complete system. Acceptance cases are supplied contracts, not tests invented by
+candidate code to approve itself.
+
+A goal can require evidence as well as types:
+
+```toml
+[goal]
+name = "source-preserving-ingestion"
+requires = { id = "knowledge.chunker", version = "1" }
+capabilities = ["source-preserving-chunking"]
+
+[evidence]
+tasks = ["<sha256 of the prepared acceptance contract>"]
+evaluators = ["knowledge-ci"]
+```
+
+The [evidence guide](docs/evidence-selection.md) explains how observations bind
+to a whole composition, including its supplied dependencies. Changing a vector
+provider, Python wheel, interpreter, or runtime can require reevaluation. Attestations support Ed25519 public evaluator identities and HMAC within an
+operator trust domain. Consumers configure trusted public keys explicitly. Finite passing cases establish those observations,
+not a proof of arbitrary Python behavior.
+
+The durable queue supports remote authenticated workers, atomic claims, lease
+renewal, stale-worker fencing, immutable prerequisite DAGs, and crash recovery.
+A million task records have been exercised with eight real worker processes.
+See the [coordination measurements](docs/coordination-scale.md) for throughput,
+resource use, and the distinction between records and active agents. A Python
+virtual environment isolates dependencies; untrusted candidate execution still
+requires an operator-provided OS sandbox.
 
 ## Run the examples
 
@@ -455,11 +524,11 @@ The project draws on ML signatures, functors, abstract types, and sharing; modul
 
 The research direction is a software ecosystem where an agent can begin with a desired system, find its missing contracts, delegate those contracts to other agents, and assemble the resulting contributions. Richer module types, reusable protocols, evaluation-backed selection, and distributed publication are the foundations for that ecosystem.
 
-Version 0.6.0 implements the build and repository core, nonrecursive open module composition with associated-type substitution, bounded constructor synthesis, a restricted typed language, and executable contribution contracts with local evaluation and explicit acceptance. Million-agent coordination is the target architecture; the current repository is single-node and does not provide agent scheduling or federation. Python providers remain trusted. Full generative module typing, arbitrary program synthesis, and automatic lifecycle reasoning remain research work.
+The implementation includes the build and repository core, open module composition, associated-type substitution in graphs and checked operations, bounded constructor synthesis, ownership/effect checks, durable remote worker coordination, staged contributions, and authenticated evidence-aware selection. Local repository and queue services use SQLite; federated discovery combines independent repositories through bounded queries. Operation with millions of simultaneously active agents remains unmeasured. Python providers remain trusted. Full generative module typing, arbitrary program synthesis, and automatic lifecycle reasoning remain research work.
 
 Local scale measurements include 10,000 definitions across 1,000 contribution files with a 21-line root TOML, and a copied Mari workload with 988 public definitions. These measure compact authoring and selective builds, rather than concurrent agent capacity.
 
-The 0.6.0 validation records **567 tests and 32 subtests passing**, plus lint, wheel construction, and the associated-type knowledge-system example. Historical 0.5.0 and 0.4.0 reports retain the contribution-loop and SQLite evidence. Historical reports cover the composed knowledge system, copied Mari migration, and local source-scale workloads. These are separate measurements with their scopes recorded in [validation](docs/VALIDATION.md).
+The 0.7.0 validation includes the agent-authored knowledge graph, generic checked operations, contribution campaigns, federated discovery, and authenticated evaluation. Exact test counts, wheel checks, and measured scopes are recorded in the current validation report. Historical 0.5.0 and 0.4.0 reports retain the contribution-loop and SQLite evidence. Historical reports cover the composed knowledge system, copied Mari migration, and local source-scale workloads. These are separate measurements with their scopes recorded in [validation](docs/VALIDATION.md).
 
 ```bash
 .venv/bin/pytest -q
@@ -480,5 +549,9 @@ The 0.6.0 validation records **567 tests and 32 subtests passing**, plus lint, w
 | [Module calculus design](docs/module-calculus.md) | Broader calculus, remaining language features, and implementation milestones. |
 | [Synthesis guide](docs/synthesis.md) | Constructor search, ambiguity, policies, and program locks. |
 | [Repository guide](docs/repository.md) | Publication, authentication, and artifact retrieval. |
+| [Federation](docs/federation.md) | Independent repository shards, bounded discovery, and immutable identity conflicts. |
+| [Campaigns](docs/campaigns.md) | TOML task DAGs, agent workers, evaluation feedback, and final synthesis. |
+| [Evidence selection](docs/evidence-selection.md) | Exact-composition observations and trusted public evaluator identities. |
+| [Coordination measurements](docs/coordination-scale.md) | Million-record workloads, active worker counts, and readiness indexing. |
 
 Licensed under [Apache-2.0](LICENSE).

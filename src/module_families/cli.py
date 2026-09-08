@@ -216,6 +216,8 @@ def parser() -> argparse.ArgumentParser:
     synthesize.add_argument("--max-depth", type=int, default=5)
     synthesize.add_argument("--max-states", type=int, default=10000)
     synthesize.add_argument("--max-solutions", type=int, default=16)
+    synthesize.add_argument("--evidence-store")
+    synthesize.add_argument("--trust-keys-env", default="MF_EVIDENCE_KEYS")
     contribution_plan = sub.add_parser("plan-contributions", help="Turn missing providers into bounded contribution handoffs")
     contribution_plan.add_argument("goal")
     contribution_plan.add_argument("--out", required=True)
@@ -249,6 +251,7 @@ def parser() -> argparse.ArgumentParser:
     assembly_lock.add_argument("resolution")
     assembly_lock.add_argument("--choice", type=int)
     assembly_lock.add_argument("--out", required=True)
+    assembly_lock.add_argument("--trust-keys-env", default="MF_EVIDENCE_KEYS")
     execute = sub.add_parser(
         "execute",
         help="Verify and instantiate an assembly, then call an exported operation",
@@ -335,12 +338,19 @@ def parser() -> argparse.ArgumentParser:
             action="append",
             help="Allowed declared effect; repeat as needed",
         )
+    from .automation_cli import register
+
+    register(sub)
     return root
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        from .automation_cli import COMMANDS, run, trust_keys
+
+        if args.command in COMMANDS:
+            return run(args, _emit)
         if args.command == "init":
             from .authoring import draft_family
 
@@ -546,6 +556,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.out,
                 )
             elif args.command == "synthesize":
+                from .evidence import EvidenceStore
                 from .synthesis import synthesize
 
                 request = tomllib.loads(Path(args.goal).read_text())
@@ -556,6 +567,8 @@ def main(argv: list[str] | None = None) -> int:
                         max_depth=args.max_depth,
                         max_states=args.max_states,
                         max_solutions=args.max_solutions,
+                        evidence_store=EvidenceStore(args.evidence_store) if args.evidence_store else None,
+                        trust_keys=trust_keys(args.trust_keys_env),
                     ),
                     args.out,
                 )
@@ -567,6 +580,7 @@ def main(argv: list[str] | None = None) -> int:
                         json.loads(Path(args.resolution).read_text()),
                         registry,
                         choice=args.choice,
+                        trust_keys=trust_keys(args.trust_keys_env),
                     ),
                     args.out,
                 )

@@ -1,6 +1,6 @@
 # A checked language above Python modules
 
-Version 0.4.0 implements a small composition language with nominal value types, linear/affine usage, call-scoped borrows, and declared effect bounds. `.mfl` is its source format; TOML supplies published contracts and module requirements. The compiler elaborates checked programs into ordinary Python module constructors and wheels.
+The checked composition language supports nominal and associated value types, linear/affine usage, call-scoped borrows, and declared effect bounds. `.mfl` is its source format; TOML supplies published contracts and module requirements. The compiler elaborates checked programs into ordinary Python module constructors and wheels.
 
 The existing TOML graph language remains useful for selecting and connecting whole modules. `.mfl` adds checking of the sequence of operations *inside* a composition. It does not merely count how often an artifact appears in a graph.
 
@@ -13,10 +13,10 @@ Linear Haskell demonstrates a practical coexistence of linear and unrestricted p
 The implemented judgment is informally:
 
 ```text
-Γ ; Δ ⊢ program : (T₁, …, Tₙ) ! effects
+Σ ; E ; Γ ; Δ ⊢ program : (T₁, …, Tₙ) ! effects
 ```
 
-`Γ` contains shared values. `Δ` contains live affine and linear owners. This notation describes the checker, not a published proof of its soundness. Runtime validation and tests support the implementation's stated boundaries.
+`Σ` contains kinded associated declarations and type constructors. `E` contains explicitly declared equality assumptions. `Γ` contains shared values. `Δ` contains live affine and linear owners. This notation describes the checker, not a published proof of its soundness. Runtime validation and tests support the implementation's stated boundaries.
 
 ## Published types and operations
 
@@ -37,6 +37,61 @@ This is a fragment of a full interface; [interfaces.toml](../families/transactio
 The `id` is a stable nominal identity. Aliases for one identity must agree on usage and representation, including across all interfaces in the checked program. Matching Python representations do not make two distinct identities interchangeable. Canonical literal identities `python.str`, `python.int`, `python.float`, `python.bool`, and `python.bytes` require their matching shared representations.
 
 Representations are `opaque`, `str`, `int`, `float`, `bool`, and `bytes`. Primitive values are runtime-checked against exact builtin types (`bool` is not accepted as `int`). Opaque values are accessible only through declared operations within `.mfl`; ordinary Python adapters can inspect them. These are explicit nominal identities, not fresh generative type identities or existential module types. Two providers claiming the same nominal identity must uphold that compatibility contract.
+
+## Generic value types and explicit assumptions
+
+A value declaration can use a structured `term` instead of a rigid `id`:
+
+```toml
+[interfaces.associated.types]
+Space = "identity"
+
+[interfaces.associated.constructors."knowledge.VectorBatch"]
+parameters = ["identity"]
+result = "shared"
+
+[interfaces.typing.types]
+Vectors = { term = { apply = "knowledge.VectorBatch", args = [{ var = "Space", kind = "identity" }], kind = "shared" }, usage = "shared", representation = "opaque" }
+```
+
+The interface supplies the local associated name `Space`. An encoder operation
+returning `Vectors` promises values in the selected encoder's space. An index
+accepting its own `Vectors` requires values in its own space. A program connecting
+the two must explicitly equate their witnesses:
+
+```toml
+[associated]
+sharing = [
+  [{ from = "embedding.Space", kind = "identity" }, { from = "index.Space", kind = "identity" }]
+]
+```
+
+These are fragments within full interface/program manifests, not independent
+complete programs. Ports must actually declare the referenced names and kinds.
+`associated.types` binds any public associated exports to declared terms, such as
+`DocumentId = { from = "index.DocumentId", kind = "shared" }`.
+`associated.requires` can pin selected port witnesses to concrete nominal terms.
+Constructor declarations merge consistently across the sealed interfaces and
+manifest.
+
+The checker gives every port its own scope, solves only declared equations, then
+checks operation arguments and results under the substitution. A call cannot
+invent a missing sharing requirement. Requiring the same interface twice does
+not implicitly equate its witnesses. Contradictory rigid identities, missing
+exports, unknown constructors, and wrong kinds are rejected.
+
+`typed_associated` records the symbolic assumptions in the certificate and work
+contract. Generated initialization checks selected provider metadata, discharges
+the equations, and specializes operation descriptors before any body operation
+or ownership transfer. A nominal term specializes to that nominal identity;
+constructed terms use canonical identities for their complete type expressions.
+Modes, representations, and effects retain their meaning after specialization.
+
+This is declaration-based generic checking. Provider Python is trusted to honor
+its witness. There are no fresh generative type identities, existential packages,
+higher-kinded operations, or inspection of arbitrary Python bodies. See the
+[associated-type guide](associated-types.md#generic-operation-bodies) for the
+complete workflow and runnable SQLite knowledge-base example.
 
 ## Source grammar
 
@@ -119,9 +174,9 @@ Typing makes an authored composition admissible or rejects it. The synthesizer s
 
 ## Generated artifacts and Python trust
 
-The build emits normal wheels plus `generated.py`, `certificate.json`, and `work-contract.json`. The certificate records source hash, exact interface specifications, typed IR, inferred effects, and the remaining trusted-operation boundary. Its hash is stored in published member metadata. It is an inspectable checker report; it is neither a proof assistant certificate nor a signature authenticating its author.
+The build emits normal wheels plus `generated.py`, `certificate.json`, and `work-contract.json`. The certificate records source hash, exact interface specifications, associated assumptions and substitutions, typed IR, inferred effects, and the remaining trusted-operation boundary. Its hash is stored in published member metadata. It is an inspectable checker report; it is neither a proof assistant certificate nor a signature authenticating its author.
 
-Generated code calls small ownership guards and then selected Python functions. It performs no provider search or source parsing at runtime. `Owned` handles track identity, usage, validity, and active borrows; copies and serialization are rejected. Moves invalidate before adapter execution. Multi-argument preflight completes before any input is consumed. Borrow locks cover the synchronous call and release on failure. Nested checked operations preserve their handles rather than unwrapping them as raw adapters.
+Generated code calls small ownership guards and then selected Python functions. It performs no provider search or source parsing at runtime. `Owned` handles track identity, usage, validity, and active borrows; copies and serialization are rejected. Moves invalidate before adapter execution. Multi-argument preflight completes before any input is consumed. Borrow locks cover the synchronous call and release on failure. Nested checked operations preserve their handles rather than unwrapping them as raw adapters. This also holds for a generic owned result such as `Lease[store.Domain]`: inner and outer constructors specialize their descriptors to the same concrete identity, so a returned handle can be passed onward under the outer move/borrow rules. A declaration mismatch is rejected before either body executes.
 
 Return validation checks primitive representations, nominal handle identities for nested checked code, and arity. It rejects direct and ordinary-container escape of borrowed values and duplicate owned return identities within a call. This is not an alias analysis of arbitrary Python heaps.
 

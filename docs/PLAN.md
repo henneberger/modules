@@ -123,3 +123,15 @@ The sequence above records the plan that guided development. Current code additi
 - Existing behavior is preserved for supported extraction cases; unsupported cases receive useful diagnostics and explicit adaptation paths.
 - Publication rejects content replacement, damaged artifacts, and invalid dependency graphs. Import returns a completed checked bundle or raises, with no rollback claim for arbitrary Python effects.
 - Measurements separate authoring burden, generated inventory size, artifact granularity, runtime composition, and actual scale. No benchmark on two families is described as proof of megascale operation.
+
+
+## Implemented agent-composition increment
+
+The 0.7.0 increment connects separately checked associated-type operation bodies,
+bounded worker context, staged code contributions, independent evaluation,
+Ed25519/HMAC observations, prerequisite campaigns, evidence-aware synthesis, and
+read federation. An actual coding agent composed the existing knowledge providers
+in TOML and passed the original system contract. See the README for the executable
+workflow and the validation reports for exact workload sizes. This closes the
+local contribution-to-system loop; neither a successful local task nor a million
+queue records establishes operation with millions of concurrent coding agents.

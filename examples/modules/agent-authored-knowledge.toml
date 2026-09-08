@@ -1,0 +1,57 @@
+# Authored by the actual Codex integration worker; see docs/live-composition-validation.json.
+schema_version = 1
+
+[family]
+name = "knowledge"
+version = "1.0.0"
+description = "Composable knowledge retrieval and execution modules"
+
+[publisher]
+name = "agent-integrator"
+
+[module]
+id = "system"
+version = "1.0.0"
+provides = { id = "knowledge.system", version = "1" }
+summary = "Batch diversified retrieval with cached embeddings and a shared source-preserving document store"
+capabilities = ["batch-retrieval", "cached-embeddings", "diversified-retrieval"]
+
+[nodes.hashing.select]
+family = "knowledge"
+member = "adapters.hashing"
+
+[nodes.embedding.select]
+family = "knowledge"
+member = "adapters.cached_embedding"
+
+[nodes.data.select]
+family = "knowledge"
+member = "adapters.sqlite_documents"
+
+[nodes.retrieval.select]
+family = "knowledge"
+member = "integrator.retrieval"
+
+[nodes.batch.select]
+family = "knowledge"
+member = "adapters.threaded_queries"
+
+[links]
+"embedding.base" = "hashing"
+"retrieval.data" = "data"
+"retrieval.embedding" = "embedding"
+"batch.data" = "data"
+"batch.retrieval" = "retrieval"
+
+[constraints]
+same_instance = [["batch.data", "retrieval.data"]]
+
+[exports]
+run = "batch.run"
+close = "data.close"
+
+[indices]
+Space = "embedding.Space"
+
+[policy]
+allowed_effects = ["caller-iteration", "memory", "threads"]

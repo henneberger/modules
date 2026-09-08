@@ -314,9 +314,9 @@ def test_typed_build_bytes_do_not_depend_on_output_directory(tmp_path):
     assert a["members"][0]["sha256"] == b["members"][0]["sha256"]
 
 
-def test_associated_value_body_requires_explicit_language_extension(tmp_path):
+def test_associated_result_requires_explicit_witness(tmp_path):
     output = contract(effects=[])
     output["associated"] = {"types": {"Space": "identity"}}
     repository, manifest = prepare(tmp_path, 'return "ok"', output=output)
-    with pytest.raises(TypeCheckError, match="module graph linker"):
+    with pytest.raises(TypeCheckError, match="associated exports differ"):
         check_program(manifest, repository)

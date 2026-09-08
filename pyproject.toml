@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "module-families"
-version = "0.6.0"
+version = "0.7.0"
 description = "TOML-driven builds for reusable Python module families and agent-readable dependencies"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,6 +16,7 @@ dependencies = ["packaging>=24.0"]
 mf = "module_families.cli:main"
 
 [project.optional-dependencies]
+signing = ["cryptography>=45"]
 dev = ["pytest>=8", "build>=1.2", "ruff>=0.12"]
 
 [tool.setuptools.packages.find]

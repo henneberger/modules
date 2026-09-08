@@ -39,6 +39,36 @@ def _digest(value) -> str:
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
 
 
+def _candidate_process(command, **kwargs):
+    """Remove ambient credentials from processes that may load candidate code.
+
+    Installed wheel .pth files execute at interpreter startup, including metadata
+    checks. A clean environment and temporary home prevent accidental credential
+    inheritance; they do not restrict same-user filesystem or process access.
+    """
+    executable = str(command[0])
+    if os.path.dirname(executable):
+        executable = str(Path(executable).absolute())
+    else:
+        executable = shutil.which(executable) or executable
+    with tempfile.TemporaryDirectory(prefix="mf-candidate-home-") as home:
+        environment = {
+            "PATH": os.defpath,
+            "HOME": home,
+            "USERPROFILE": home,
+            "TMPDIR": home,
+            "TMP": home,
+            "TEMP": home,
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+        }
+        if os.name == "nt" and "SystemRoot" in os.environ:
+            environment["SystemRoot"] = os.environ["SystemRoot"]
+        return subprocess.run(
+            [executable, *command[1:]], env=environment, cwd=home, **kwargs
+        )
+
+
 def interpreter(python: str = sys.executable) -> dict:
     code = """import hashlib, json, os, platform, sys, sysconfig
 from pathlib import Path
@@ -64,7 +94,7 @@ print(json.dumps({'version':sys.version.split()[0], 'implementation':sys.impleme
     'binary_sha256':hashlib.sha256(Path(sys.executable).resolve().read_bytes()).hexdigest(),
     'markers': markers}))
 """
-    process = subprocess.run(
+    process = _candidate_process(
         [str(python), "-I", "-c", code], capture_output=True, text=True, check=True
     )
     return json.loads(process.stdout)
@@ -301,6 +331,16 @@ def lock_environment(
             "runtime": _wheel(runtime),
             "wheelhouse": "wheels",
         }
+        from .evidence import (
+            EvidenceError,
+            environment_fingerprint,
+            verify_environment_evidence,
+        )
+
+        try:
+            verify_environment_evidence(assembly, environment_fingerprint(lock))
+        except EvidenceError as error:
+            raise EnvironmentError(str(error)) from error
         lock["sha256"] = _digest(lock)
         wheelhouse = root / "wheels"
         wheelhouse.mkdir()
@@ -378,6 +418,9 @@ def _verify_environment(path: str | Path, *, python: str) -> tuple[dict, Path]:
             if record is None or record["sha256"] != artifact["sha256"]:
                 raise EnvironmentError("environment omits a pinned module dependency")
     _validate_dependencies(records, lock["interpreter"])
+    from .evidence import environment_fingerprint, verify_environment_evidence
+
+    verify_environment_evidence(lock["assembly"], environment_fingerprint(lock))
     return lock, wheelhouse
 
 
@@ -390,7 +433,7 @@ def sync_environment(
     _no_symlinks(target)
     if target.exists():
         raise EnvironmentError(f"environment target already exists: {target}")
-    subprocess.run(
+    _candidate_process(
         [str(python), "-I", "-m", "venv", str(target)],
         check=True,
         capture_output=True,
@@ -405,7 +448,7 @@ def sync_environment(
         )
         + "\n"
     )
-    process = subprocess.run(
+    process = _candidate_process(
         [
             str(executable),
             "-I",
@@ -429,7 +472,7 @@ def sync_environment(
         raise EnvironmentError(
             "offline installation failed; incomplete environment was not activated"
         )
-    checked = subprocess.run(
+    checked = _candidate_process(
         [str(executable), "-I", "-m", "pip", "--isolated", "check"],
         capture_output=True,
         text=True,
@@ -509,7 +552,7 @@ def run_environment(
         != lock["sha256"]
     ):
         raise EnvironmentError("environment was not prepared for this lock")
-    process = subprocess.run(
+    process = _candidate_process(
         [
             str(executable),
             "-I",

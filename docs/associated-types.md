@@ -1,8 +1,8 @@
-# Associated types in module graphs
+# Associated types in module graphs and checked programs
 
 Version 0.6.0 adds kinded type terms, abstract associated declarations, and substitution through the existing module graph builder. An open module can preserve a relationship between its dependencies without choosing their implementations or assigning one global concrete name to every type it uses.
 
-The same declarations are checked by repository assembly resolution, constructor synthesis, lock verification, and generated graph preflight. There is no new resolver command: use `resolve-module`, `build-module`, and `synthesize` as before.
+The same declarations are checked by repository assembly resolution, constructor synthesis, lock verification, and generated graph preflight. The current implementation also substitutes associated types inside generic `.mfl` operation bodies. Use `resolve-module` and `build-module` for graphs, `check-program` and `build-program` for checked bodies, and `synthesize` to select implementations for either.
 
 ## A type belongs to a module
 
@@ -143,10 +143,112 @@ Use an empty work directory. The example reuses Mari MMR, scikit-learn lexical v
 
 Dependency locking can download the required wheels. For offline resolution, pass `--wheelhouse PATH` with the wheelhouse described in the [knowledge guide](module-build.md#run-the-real-candidate-system).
 
-## Scope of this increment
+## Generic operation bodies
 
-Implemented: kinded first-order terms, interface-local associated variables, explicit provider witnesses, constructor applications, scoped substitution, residual graph equalities, typed export projection checks, publication, synthesis, and runtime metadata validation.
+Associated types now connect values flowing between operations inside `.mfl`, as
+well as exports at module boundaries. Consider this body:
 
-Not yet implemented: associated-value substitution within `.mfl` operation bodies, generated fresh type witnesses, applicative identity inference from a constructor's artifact and arguments, existential packaging, higher-kinded types, recursive modules, subtyping, or a soundness proof. `.mfl` rejects interfaces using associated value terms with an explicit diagnostic; it does not silently discard those types. Graph-level type substitution preserves ownership declarations, but Python operation bodies remain outside the checker.
+```python
+vectors = embedding.embed(texts)
+results = index.search(vectors)
+return results
+```
 
-The broader [module calculus design](module-calculus.md) describes those later steps. This release implements the graph-linking portion rather than presenting the full proposed calculus as executable.
+The encoder produces `VectorBatch[embedding.Space]`; the index accepts
+`VectorBatch[index.Space]`. Equal shapes, dimensions, or local alias names do not
+establish compatibility. The manifest must state the relationship explicitly:
+
+```toml
+[associated]
+sharing = [
+  [{ from = "embedding.Space", kind = "identity" }, { from = "index.Space", kind = "identity" }]
+]
+
+[associated.types]
+DocumentId = { from = "index.DocumentId", kind = "shared" }
+```
+
+This fragment assumes the public result interface declares `DocumentId`, and the
+ports declare their corresponding associated exports. The body is checked under
+these assumptions before either implementation exists. Omitting the equality
+rejects the call; the checker does not infer and silently publish new obligations
+from a body that happens to pass one module's result to another.
+
+Each port gets its own symbolic scope. Two ports requiring the same interface do
+not automatically receive the same associated identity. Explicit
+`associated.requires` can instead constrain a port witness to a fixed nominal
+domain. A public associated export must have an explicit `associated.types`
+witness; every declared public export must be supplied.
+
+The `typed_associated` elaboration component merges the declared constructor
+registries, solves only the manifest's equality assumptions, and substitutes the
+result through parameter/result types. It retains `associated_assumptions` in the
+certificate and work contract: sealed port/result interfaces, original equations,
+constructor declarations, substitutions, and symbolic value terms. Publication
+preserves the constructor's assumptions for later linking.
+
+At generated-constructor initialization, selected port metadata supplies concrete
+witnesses. The linker checks those witnesses and equations before running any
+checked operation or transferring input ownership. Operation descriptors are then
+specialized to concrete nominal identities or canonical constructed-type
+identities. Runtime does not search for providers or reparse the source.
+
+An applied `Lease[store.Domain]` can be linear, for example. Substitution changes
+its identity without weakening move/borrow rules. An inner checked operation can
+return an owned value to an outer checked operation: both use the same concrete
+specialized identity, and the outer operation can move or borrow that handle.
+Returning through nested checked constructors does not unwrap and rewrap it as
+an unrelated raw Python value. Normal-path linear obligations still apply, and
+exception cleanup is still a trusted implementation responsibility.
+
+### Run generic knowledge-base search
+
+```bash
+.venv/bin/python examples/associated_program.py \
+  --work-dir .mf/associated-program \
+  --wheelhouse .mf/upstream-wheels
+```
+
+Omit `--wheelhouse` to allow dependency-wheel resolution from the configured
+index. Use an empty work directory. This example requires SQLite with FTS5, as
+provided by the Python build used in this project's validation.
+
+The [three-line body](../examples/associated_program/search.mfl) prepares a phrase
+query and searches an actual SQLite FTS5 index. Its
+[manifest](../examples/associated_program/search.toml) requires the query preparer
+and index to share `QuerySyntax`, and exports the index's `DocumentId` domain.
+Typed results preserve that document domain. Searching `data retention` returns
+`retention-2026`, page 3, with its source text.
+
+The example publishes contracts first, checks and publishes the open body with
+no providers, rejects the same body without its equality assumption, then
+publishes providers. Synthesis rejects a provider declaring a contradictory query
+syntax and selects the compatible composition. The program is locked and executed
+in an offline environment. The negative provider intentionally reuses the same
+Python implementation with contradictory metadata: it demonstrates declaration
+checking, not automatic discovery of dishonest declarations.
+
+The source corpus is a small illustrative company-policy fixture. The query and
+index modules are thin ordinary-Python adapters around FTS5; the example does not
+train embeddings or demonstrate production retrieval quality. The separate
+`associated_system.py` example above covers Mari/scikit-learn vector-space and
+document-domain composition.
+
+## Implemented scope and remaining theory
+
+Implemented: kinded first-order terms, interface-local associated variables,
+explicit provider witnesses, constructor applications, scoped substitution,
+residual graph equalities, generic `.mfl` bodies under explicit assumptions, typed
+export projection checks, publication, synthesis, and runtime metadata validation.
+Shared, affine, and linear value usage survives specialization and nested checked
+returns.
+
+Still absent: fresh generative witnesses, applicative identity inference from a
+constructor's artifact and arguments, existential packaging, higher-kinded types,
+recursive modules, subtyping, and a soundness proof. Two providers declaring the
+same rigid witness promise compatibility; the language does not manufacture a
+fresh identity for each construction or inspect Python to prove the promise.
+
+The [module calculus design](module-calculus.md) describes the broader direction.
+The [checked-language guide](checked-language.md) explains the body grammar,
+ownership rules, and trusted Python boundary in detail.

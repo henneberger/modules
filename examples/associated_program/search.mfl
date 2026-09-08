@@ -1,0 +1,3 @@
+prepared = prepare.prepare(query)
+results = index.search(prepared)
+return results

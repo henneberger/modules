@@ -2,6 +2,23 @@
 
 Current integrated test results and end-to-end checks are recorded in [final-validation.json](final-validation.json). The source artifacts below record the interpreter and scope of each measurement. Tests cover the implemented fragment; they do not establish correctness for arbitrary Python or internet-scale operation.
 
+Version 0.7.0 passes **716 tests and 32 subtests**, Ruff, and wheel construction.
+It adds the complete staged agent contribution loop and associated
+types inside checked operation bodies. The [live composition record](live-composition-validation.json)
+documents one actual Codex invocation that received six published cards, wrote a
+TOML knowledge-system graph with no new Python implementation, passed the three
+original acceptance cases, and satisfied evidence-required synthesis. The
+[smaller adaptation record](live-agent-validation.json) covers a source-preserving
+standard-library chunker and a rejected ill-specified initial contract.
+
+The [coordination experiment](coordination-scale.md) exercises one million task
+records, eight worker processes, and 16,000 synthetic accepted workflows. It does
+not measure one million active agents or include model/evaluation costs. Federation
+tests execute cross-repository compositions and reject immutable identity conflicts.
+Campaign tests cover independent contributions, dependency ordering, retry feedback,
+and an evidence-backed final lock. Public-signature tests distinguish verification
+from signing authority and check key/algorithm substitution failures.
+
 Version 0.6.0 passes **567 tests and 32 subtests**. New checks cover kinded terms, scoped substitution, unification and occurs checks, associated interface validation, residual equations through nested publication, typed export projection, and runtime/assembly propagation. The [associated-type report](associated-types-validation.json) records real nested knowledge composition and offline execution returning first hits `dogs` and `python`. Contradictory vector-space metadata and document-ID domains are rejected before execution. The [0.5.0 report](final-validation-0.5.json) preserves the preceding contribution-loop measurements.
 
 Version 0.5.0 passes **466 tests and 32 subtests**. New coverage includes missing-provider handoffs, portable task validation, artifact-bound evaluation, actual worker timeouts, failed-evidence rejection, and exact-member acceptance. The [contribution-loop report](contribution-validation.json) records two staged knowledge graphs: one fails because ingestion and retrieval use different stores; one passes, is accepted into the repository, and closes the original goal. The final program executes offline on an additional input. The [0.4.0 report](final-validation-0.4.json) preserves the preceding language measurements.
@@ -48,4 +65,4 @@ python3 examples/typed_system.py --work-dir .mf/typed-example
 python3 -m build --wheel
 ```
 
-The current implementation includes an authenticated HTTP repository and a separate wheel-only environment resolver. Local TCP integration validates the protocol, not internet-scale capacity. Parallel contributor throughput, fine-grained incremental parsing, federation, and controlled agent adaptation quality remain evaluation targets in the [research proposal](RESEARCH.md). The analysis cache invalidates the full scoped graph when its inputs change; environment resolution delegates package selection to pip and excludes source builds.
+The current implementation includes an authenticated HTTP repository and a separate wheel-only environment resolver. Local TCP integration validates the protocol, not internet-scale capacity. Internet-scale concurrent operation, fine-grained incremental parsing, and controlled agent adaptation quality remain evaluation targets in the [research proposal](RESEARCH.md). The analysis cache invalidates the full scoped graph when its inputs change; environment resolution delegates package selection to pip and excludes source builds.

@@ -52,6 +52,7 @@ def read_program(source):
             "ports",
             "program",
             "policy",
+            "associated",
         },
         "checked program",
     )
@@ -119,15 +120,11 @@ def _resolved_types(spec):
         raise TypeCheckError(
             f"interface {spec['id']}@{spec['version']} has no typed contract"
         )
-    if spec.get("associated", {}).get("types") or any("term" in value for value in typing["types"].values()):
-        raise TypeCheckError(
-            "associated value terms currently require the module graph linker; .mfl substitution is not implemented"
-        )
     return typing["types"]
 
 
 class _Checker:
-    def __init__(self, doc, source, interfaces):
+    def __init__(self, doc, source, interfaces, imports=None, result=None):
         self.doc, self.source, self.interfaces = doc, source, interfaces
         self.types, self.effects = {}, set()
         self.imports = {}
@@ -153,6 +150,8 @@ class _Checker:
             self.imports[name] = lookup[(ref["id"], ref["version"])]
         ref = doc["module"]["provides"]
         self.result = lookup[(ref["id"], ref["version"])]
+        if imports is not None:
+            self.imports, self.result = imports, result
         self.export = doc["program"].get("export", "run")
         if set(self.result["callables"]) != {self.export} or self.result["types"]:
             raise TypeCheckError(
@@ -462,12 +461,19 @@ def check_program(source, repository):
         for ref in references
     }
     interfaces = [specs[key] for key in sorted(specs)]
-    checker = _Checker(doc, text, interfaces)
+    from .typed_associated import prepare
+
+    try:
+        imports, result, assumptions = prepare(doc, interfaces)
+        checker = _Checker(doc, text, [*imports.values(), result], imports, result)
+    except ValueError as error:
+        raise TypeCheckError(str(error)) from error
     report = {
         "format": FORMAT,
         "document": doc,
         "source_sha256": hashlib.sha256(text.encode()).hexdigest(),
         "interfaces": interfaces,
+        "associated_assumptions": assumptions,
         "parameters": checker.parameters,
         "returns": checker.returns,
         "types": checker.types,
@@ -494,6 +500,7 @@ def _python(report):
     lines = [
         "from module_families.ownership import invoke as _invoke, move_owned as _move, drop_owned as _drop, mark_checked as _checked",
         "from module_families.contracts import Requirement as _Requirement",
+        "from module_families.typed_associated import specialize_runtime as _specialize, descriptors as _descriptors",
         "from module_families.interfaces import signature_from_spec as _signature",
         "",
         "def create(" + ("*, " + ", ".join(names) if names else "") + "):",
@@ -503,6 +510,9 @@ def _python(report):
         lines.append(
             f"    _Requirement(_signature({specs[(ref['id'], ref['version'])]!r})).check({name}, {name!r})"
         )
+    ports = "{" + ", ".join(repr(name) + ": " + name for name in names) + "}"
+    lines.append(f"    _identities = _specialize({report['associated_assumptions']!r}, {ports})")
+    lines.append("    def _d(values): return _descriptors(values, _identities)")
     params = report["parameters"]
     export = doc["program"].get("export", "run")
     # Preserve the public call shape, including positional-only parameters.
@@ -520,7 +530,7 @@ def _python(report):
             for p in params
         ]
         lines.append(
-            f"        {arguments}, = _invoke(lambda *items: items[0] if len(items) == 1 else items, [{arguments}], {params!r}, {returns!r})"
+            f"        {arguments}, = _invoke(lambda *items: items[0] if len(items) == 1 else items, [{arguments}], _d({params!r}), _d({returns!r}))"
         )
 
     def value(expr, move=False):
@@ -548,7 +558,7 @@ def _python(report):
                 lines.append(
                     indent
                     + prefix
-                    + f"_invoke({statement['port']}[{statement['export']!r}], [{args}], {statement['parameters']!r}, {statement['returns']!r})"
+                    + f"_invoke({statement['port']}[{statement['export']!r}], [{args}], _d({statement['parameters']!r}), _d({statement['returns']!r}))"
                 )
             elif kind == "bind":
                 lines.append(
@@ -570,7 +580,7 @@ def _python(report):
 
     emit(report["ir"], "        ")
     lines.append(
-        f"    return {{{export!r}: _checked(_entry, {params!r}, {report['returns']!r})}}"
+        f"    return {{{export!r}: _checked(_entry, _d({params!r}), _d({report['returns']!r}))}}"
     )
     result = "\n".join(lines) + "\n"
     compile(result, "<checked module>", "exec")
@@ -606,6 +616,7 @@ def build_program(source, repository, out):
         ),
         "capabilities": doc["module"].get("capabilities", []),
         "implementation_trust": "checked-composition",
+        "associated": report["associated_assumptions"]["associated"],
         "checked_program": {
             "format": FORMAT,
             "certificate_sha256": report["sha256"],
@@ -634,6 +645,7 @@ def build_program(source, repository, out):
                 "provides": member["provides"],
                 "requires": member["requires"],
                 "interfaces": report["interfaces"],
+                "associated_assumptions": report["associated_assumptions"],
                 "guarantees": report["guarantees"],
                 "trusted_operations": report["trusted_operations"],
             }

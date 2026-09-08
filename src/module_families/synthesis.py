@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import re
 import tomllib
 from pathlib import Path
 
@@ -37,11 +38,18 @@ def read_goal(source: str | Path | dict) -> dict:
         document = tomllib.loads(path.read_text())
     if not isinstance(document, dict) or document.get("schema_version") != 1:
         raise SynthesisError("goal schema_version must be 1")
-    if set(document) - {"schema_version", "goal", "policy", "preferences"}:
+    if set(document) - {"schema_version", "goal", "policy", "preferences", "evidence"}:
         raise SynthesisError("unknown synthesis request fields")
     goal = document.get("goal")
-    if not isinstance(goal, dict) or set(goal) - {"name", "requires", "capabilities"}:
-        raise SynthesisError("goal declares name, requires and capabilities")
+    if not isinstance(goal, dict) or set(goal) - {
+        "name",
+        "requires",
+        "capabilities",
+        "root",
+    }:
+        raise SynthesisError(
+            "goal declares name, requires, capabilities and optional exact root"
+        )
     if not isinstance(goal.get("name"), str) or not goal["name"].strip():
         raise SynthesisError("goal.name must be a nonempty string")
     try:
@@ -56,6 +64,30 @@ def read_goal(source: str | Path | dict) -> dict:
     ):
         raise SynthesisError("goal.capabilities must be a list of nonempty labels")
     goal["capabilities"] = sorted(set(capabilities))
+    if "evidence" in document:
+        from .evidence import validate_policy
+
+        document["evidence"] = validate_policy(document["evidence"])
+    if "root" in goal:
+        root = goal["root"]
+        if (
+            not isinstance(root, dict)
+            or set(root) != {"family", "id", "version", "sha256"}
+            or any(
+                not isinstance(value, str)
+                or not value.strip()
+                or value != value.strip()
+                for value in root.values()
+            )
+            or re.fullmatch(r"[0-9a-f]{64}", root["sha256"]) is None
+        ):
+            raise SynthesisError(
+                "goal.root must identify exact family, id, version and SHA256"
+            )
+        try:
+            Version(root["version"])
+        except ValueError as error:
+            raise SynthesisError("goal.root.version must be a valid version") from error
     preferences = document.get("preferences", {})
     if (
         not isinstance(preferences, dict)
@@ -124,6 +156,10 @@ def validate_selection(
             visit(child, depth + 1, next_active)
 
     visit(expression, 1, set())
+    if "root" in document["goal"] and _identity(cards[expression["use"]]) != _identity(
+        document["goal"]["root"]
+    ):
+        raise SynthesisError("selected root differs from the required exact artifact")
     if used != set(cards):
         raise SynthesisError("synthesized candidates differ from the used expression")
     if cards[expression["use"]]["provides"] != document["goal"]["requires"]:
@@ -158,6 +194,8 @@ def synthesize(
     max_states: int = 10000,
     max_solutions: int = 16,
     max_candidates: int = 100,
+    evidence_store=None,
+    trust_keys=None,
 ) -> dict:
     """Search bounded constructor applications without imports or downloads.
 
@@ -248,6 +286,12 @@ def synthesize(
 
     def expand(reference, depth, active):
         for card in candidates(reference):
+            if (
+                depth == 1
+                and "root" in document["goal"]
+                and _identity(card) != _identity(document["goal"]["root"])
+            ):
+                continue
             tick()
             alias, identity = _alias(card), _identity(card)
             if not _is_open({"requires": {}, **card}):
@@ -360,6 +404,53 @@ def synthesize(
                     }
                 )
                 continue
+            if "evidence" in document:
+                if evidence_store is None or trust_keys is None:
+                    reject(
+                        {
+                            "code": "missing-evidence-trust",
+                            "error": "evidence policy requires a store and explicit evaluator trust keys",
+                        }
+                    )
+                    continue
+                try:
+                    bindings = {}
+                    for alias, card in cards.items():
+                        binding = repository.lock(
+                            card["family"], card["id"], version=card["version"]
+                        )
+                        if canonical_bytes(binding["member"]) != canonical_bytes(card):
+                            raise SynthesisError(
+                                "repository member changed during evidence selection"
+                            )
+                        bindings[alias] = binding
+                    assembly = {
+                        "expression": solution["expression"],
+                        "bindings": bindings,
+                        "interfaces": specs,
+                        "type_libraries": [],
+                    }
+                    match = evidence_store.match(
+                        assembly, document["evidence"], trust_keys
+                    )
+                    if not match["accepted"]:
+                        reject(
+                            {
+                                "code": "evidence-unsatisfied",
+                                "context_sha256": match["context_sha256"],
+                                "missing_tasks": match["missing_tasks"],
+                                "details": match["rejections"],
+                            }
+                        )
+                        continue
+                    solution["evidence"] = {
+                        "policy": document["evidence"],
+                        "context_sha256": match["context_sha256"],
+                        "observations": match["observations"],
+                    }
+                except (ValueError, KeyError, TypeError) as error:
+                    reject({"code": "invalid-evidence", "error": str(error)})
+                    continue
             if len(solutions) >= max_solutions:
                 limited.add("max_solutions")
                 break

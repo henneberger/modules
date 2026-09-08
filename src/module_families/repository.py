@@ -492,4 +492,8 @@ def open_repository(location, token=None, cache=None) -> Registry | RemoteRegist
     """Open a filesystem repository or an HTTP(S) repository with the same API."""
     if str(location).startswith(("http://", "https://")):
         return RemoteRegistry(str(location), token=token, cache=cache)
+    if str(location).endswith(".federation.toml"):
+        from .federation import open_federation
+
+        return open_federation(location)
     return Registry(Path(location))

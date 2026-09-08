@@ -1,0 +1,47 @@
+schema_version = 1
+
+[family]
+description = "Generic checked SQLite knowledge-base search"
+name = "typed-knowledge"
+version = "1.0.0"
+
+[publisher]
+name = "sqlite"
+
+[source]
+license_files = ["../../LICENSE"]
+package = "kb_fts"
+root = "src"
+
+[[members]]
+associated = { constructors = { "kb.PreparedQuery" = { parameters = ["identity"], result = "shared" }, "kb.SearchResults" = { parameters = ["shared"], result = "shared" } }, types = { QuerySyntax = { kind = "identity", nominal = "sqlite.fts5.phrase-query.v1" } } }
+effects = []
+id = "phrase"
+implementation_trust = "trusted-python"
+kind = "module-factory"
+provides = { id = "kb.generic.query", version = "1" }
+summary = "phrase"
+symbol = "kb_fts:create_parser"
+version = "1.0.0"
+
+[[members]]
+associated = { constructors = { "kb.PreparedQuery" = { parameters = ["identity"], result = "shared" }, "kb.SearchResults" = { parameters = ["shared"], result = "shared" } }, types = { DocumentId = { kind = "shared", nominal = "company.policy-document-id.v1" }, QuerySyntax = { kind = "identity", nominal = "sqlite.fts5.phrase-query.v1" } } }
+effects = ["sqlite"]
+id = "fts"
+implementation_trust = "trusted-python"
+kind = "module-factory"
+provides = { id = "kb.generic.index", version = "1" }
+summary = "fts"
+symbol = "kb_fts:create_index"
+version = "1.0.0"
+
+[[members]]
+associated = { constructors = { "kb.PreparedQuery" = { parameters = ["identity"], result = "shared" }, "kb.SearchResults" = { parameters = ["shared"], result = "shared" } }, types = { DocumentId = { kind = "shared", nominal = "company.policy-document-id.v1" }, QuerySyntax = { kind = "identity", nominal = "fixture.other-query-syntax" } } }
+effects = ["sqlite"]
+id = "contradictory-fts"
+implementation_trust = "trusted-python"
+kind = "module-factory"
+provides = { id = "kb.generic.index", version = "1" }
+summary = "contradictory-fts"
+symbol = "kb_fts:create_index"
+version = "1.0.0"

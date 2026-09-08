@@ -1,0 +1,332 @@
+{
+  "100k": {
+    "format": "module-families-coordination-benchmark-1",
+    "environment": {
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "python": "3.14.6",
+      "sqlite": "3.53.4",
+      "machine": "arm64"
+    },
+    "workload": {
+      "task_records": 100000,
+      "additional_fencing_probe_records": 1,
+      "active_worker_processes": 4,
+      "worker_identity_count": 4,
+      "additional_probe_identities": 2,
+      "completed_workflows": 4000,
+      "batch_size": 1000,
+      "payload_bytes_per_record": 122,
+      "payload_deduplication": false,
+      "transport": "local SQLite API",
+      "acceptance": "synthetic admin acceptance; no contribution evaluator or model calls"
+    },
+    "enqueue": {
+      "seconds": 1.624199166893959,
+      "records_per_second": 61568.8038993612
+    },
+    "completion": {
+      "seconds_including_process_startup": 3.175136750098318,
+      "workflows_per_second": 1259.7882594745377,
+      "claim_seconds": {
+        "p50": 0.00019424967467784882,
+        "p95": 0.0006217923946678638,
+        "p99": 0.0017778752371668816,
+        "max": 0.23948841681703925
+      },
+      "claim_submit_accept_seconds": {
+        "p50": 0.0005951672792434692,
+        "p95": 0.0021534166298806667,
+        "p99": 0.02769133308902383,
+        "max": 0.48918400006368756
+      },
+      "latency_sample_count": 4000,
+      "sample_limit_per_worker": 10000
+    },
+    "fencing": {
+      "abandoned_lease_reclaimed": true,
+      "stale_submission_rejected": true,
+      "old_fence": 1,
+      "new_fence": 2,
+      "method": "real expired lease; no process kill or database crash injected"
+    },
+    "states": {
+      "accepted": 4001,
+      "pending": 96000
+    },
+    "database_bytes_after_checkpoint": 35545088,
+    "limitations": [
+      "Task records are not concurrent agents.",
+      "No model inference, artifact transfer, evaluator, HTTP or TLS cost included.",
+      "Small identical payloads reference one shared contract; payload text is stored per task.",
+      "SQLite has one writer; results measure one local host, not distributed consensus or network partitions."
+    ]
+  },
+  "1m": {
+    "format": "module-families-coordination-benchmark-1",
+    "environment": {
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "python": "3.14.6",
+      "sqlite": "3.53.4",
+      "machine": "arm64"
+    },
+    "workload": {
+      "task_records": 1000000,
+      "additional_fencing_probe_records": 1,
+      "active_worker_processes": 8,
+      "worker_identity_count": 8,
+      "additional_probe_identities": 2,
+      "completed_workflows": 16000,
+      "batch_size": 1000,
+      "payload_bytes_per_record": 122,
+      "payload_deduplication": false,
+      "transport": "local SQLite API",
+      "acceptance": "synthetic admin acceptance; no contribution evaluator or model calls"
+    },
+    "enqueue": {
+      "seconds": 16.82284841639921,
+      "records_per_second": 59442.965617236514
+    },
+    "completion": {
+      "seconds_including_process_startup": 10.601712916046381,
+      "workflows_per_second": 1509.1900834046319,
+      "claim_seconds": {
+        "p50": 0.00019479170441627502,
+        "p95": 0.0005579590797424316,
+        "p99": 0.012046082876622677,
+        "max": 1.5252868747338653
+      },
+      "claim_submit_accept_seconds": {
+        "p50": 0.000599750317633152,
+        "p95": 0.005153417121618986,
+        "p99": 0.07679804181680083,
+        "max": 2.0848435000516474
+      },
+      "latency_sample_count": 16000,
+      "sample_limit_per_worker": 10000
+    },
+    "fencing": {
+      "abandoned_lease_reclaimed": true,
+      "stale_submission_rejected": true,
+      "old_fence": 1,
+      "new_fence": 2,
+      "method": "real expired lease; no process kill or database crash injected"
+    },
+    "states": {
+      "accepted": 16001,
+      "pending": 984000
+    },
+    "database_bytes_after_checkpoint": 353087488,
+    "limitations": [
+      "Task records are not concurrent agents.",
+      "No model inference, artifact transfer, evaluator, HTTP or TLS cost included.",
+      "Small identical payloads reference one shared contract; payload text is stored per task.",
+      "SQLite has one writer; results measure one local host, not distributed consensus or network partitions."
+    ]
+  },
+  "blocked_frontier": {
+    "format": "module-families-coordination-benchmark-1",
+    "environment": {
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "python": "3.14.6",
+      "sqlite": "3.53.4",
+      "machine": "arm64"
+    },
+    "workload": {
+      "task_records": 100,
+      "additional_fencing_probe_records": 1,
+      "active_worker_processes": 1,
+      "worker_identity_count": 1,
+      "additional_probe_identities": 2,
+      "completed_workflows": 10,
+      "batch_size": 1000,
+      "payload_bytes_per_record": 122,
+      "payload_deduplication": false,
+      "transport": "local SQLite API",
+      "acceptance": "synthetic admin acceptance; no contribution evaluator or model calls"
+    },
+    "enqueue": {
+      "seconds": 0.002159582916647196,
+      "records_per_second": 46305.23756654475
+    },
+    "completion": {
+      "seconds_including_process_startup": 0.10139145888388157,
+      "workflows_per_second": 98.62763698323432,
+      "claim_seconds": {
+        "p50": 0.0006656660698354244,
+        "p95": 0.0009430828504264355,
+        "p99": 0.0009430828504264355,
+        "max": 0.000962291844189167
+      },
+      "claim_submit_accept_seconds": {
+        "p50": 0.001968707889318466,
+        "p95": 0.0024361247196793556,
+        "p99": 0.0024361247196793556,
+        "max": 0.0028292499482631683
+      },
+      "latency_sample_count": 10,
+      "sample_limit_per_worker": 10000
+    },
+    "fencing": {
+      "abandoned_lease_reclaimed": true,
+      "stale_submission_rejected": true,
+      "old_fence": 1,
+      "new_fence": 2,
+      "method": "real expired lease; no process kill or database crash injected"
+    },
+    "states": {
+      "accepted": 11,
+      "pending": 90
+    },
+    "database_bytes_after_checkpoint": 57344,
+    "limitations": [
+      "Task records are not concurrent agents.",
+      "No model inference, artifact transfer, evaluator, HTTP or TLS cost included.",
+      "Small identical payloads reference one shared contract; payload text is stored per task.",
+      "SQLite has one writer; results measure one local host, not distributed consensus or network partitions."
+    ],
+    "blocked_frontier": {
+      "blocked_high_priority_tasks": 10000,
+      "ready_tasks_completed": 100,
+      "claim_seconds": {
+        "p50": 0.005312792025506496,
+        "p95": 0.005604709032922983,
+        "p99": 0.005723332986235619,
+        "max": 0.005853708367794752
+      }
+    }
+  },
+  "indexed_100k": {
+    "format": "module-families-coordination-benchmark-1",
+    "environment": {
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "python": "3.14.6",
+      "sqlite": "3.53.4",
+      "machine": "arm64"
+    },
+    "workload": {
+      "task_records": 100000,
+      "additional_fencing_probe_records": 1,
+      "active_worker_processes": 4,
+      "worker_identity_count": 4,
+      "additional_probe_identities": 2,
+      "completed_workflows": 4000,
+      "batch_size": 1000,
+      "payload_bytes_per_record": 122,
+      "payload_deduplication": false,
+      "transport": "local SQLite API",
+      "acceptance": "synthetic admin acceptance; no contribution evaluator or model calls"
+    },
+    "enqueue": {
+      "seconds": 1.7013928331434727,
+      "records_per_second": 58775.3739477327
+    },
+    "completion": {
+      "seconds_including_process_startup": 2.991277291905135,
+      "workflows_per_second": 1337.2213973022917,
+      "claim_seconds": {
+        "p50": 0.00021187495440244675,
+        "p95": 0.0006444589234888554,
+        "p99": 0.004831708036363125,
+        "max": 0.11446970887482166
+      },
+      "claim_submit_accept_seconds": {
+        "p50": 0.0006458749994635582,
+        "p95": 0.0037994161248207092,
+        "p99": 0.0457477499730885,
+        "max": 0.5944400830194354
+      },
+      "latency_sample_count": 4000,
+      "sample_limit_per_worker": 10000
+    },
+    "fencing": {
+      "abandoned_lease_reclaimed": true,
+      "stale_submission_rejected": true,
+      "old_fence": 1,
+      "new_fence": 2,
+      "method": "real expired lease; no process kill or database crash injected"
+    },
+    "states": {
+      "accepted": 4001,
+      "pending": 96000
+    },
+    "database_bytes_after_checkpoint": 34660352,
+    "limitations": [
+      "Task records are not concurrent agents.",
+      "No model inference, artifact transfer, evaluator, HTTP or TLS cost included.",
+      "Small identical payloads reference one shared contract; payload text is stored per task.",
+      "SQLite has one writer; results measure one local host, not distributed consensus or network partitions."
+    ],
+    "blocked_frontier": {
+      "blocked_high_priority_tasks": 10000,
+      "ready_tasks_completed": 100,
+      "claim_seconds": {
+        "p50": 0.0006702081300318241,
+        "p95": 0.0008220002055168152,
+        "p99": 0.001988124568015337,
+        "max": 0.002240458969026804
+      }
+    }
+  },
+  "indexed_1m": {
+    "format": "module-families-coordination-benchmark-1",
+    "environment": {
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "python": "3.14.6",
+      "sqlite": "3.53.4",
+      "machine": "arm64"
+    },
+    "workload": {
+      "task_records": 1000000,
+      "additional_fencing_probe_records": 1,
+      "active_worker_processes": 8,
+      "worker_identity_count": 8,
+      "additional_probe_identities": 2,
+      "completed_workflows": 16000,
+      "batch_size": 1000,
+      "payload_bytes_per_record": 122,
+      "payload_deduplication": false,
+      "transport": "local SQLite API",
+      "acceptance": "synthetic admin acceptance; no contribution evaluator or model calls"
+    },
+    "enqueue": {
+      "seconds": 17.722619999665767,
+      "records_per_second": 56425.06582090341
+    },
+    "completion": {
+      "seconds_including_process_startup": 11.304122208151966,
+      "workflows_per_second": 1415.4128649159156,
+      "claim_seconds": {
+        "p50": 0.0002065831795334816,
+        "p95": 0.0006574583239853382,
+        "p99": 0.012317958287894726,
+        "max": 1.4615278341807425
+      },
+      "claim_submit_accept_seconds": {
+        "p50": 0.0006343340501189232,
+        "p95": 0.005283541977405548,
+        "p99": 0.10531141702085733,
+        "max": 2.2264738329686224
+      },
+      "latency_sample_count": 16000,
+      "sample_limit_per_worker": 10000
+    },
+    "fencing": {
+      "abandoned_lease_reclaimed": true,
+      "stale_submission_rejected": true,
+      "old_fence": 1,
+      "new_fence": 2,
+      "method": "real expired lease; no process kill or database crash injected"
+    },
+    "states": {
+      "accepted": 16001,
+      "pending": 984000
+    },
+    "database_bytes_after_checkpoint": 343273472,
+    "limitations": [
+      "Task records are not concurrent agents.",
+      "No model inference, artifact transfer, evaluator, HTTP or TLS cost included.",
+      "Small identical payloads reference one shared contract; payload text is stored per task.",
+      "SQLite has one writer; results measure one local host, not distributed consensus or network partitions."
+    ]
+  }
+}

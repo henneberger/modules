@@ -344,7 +344,9 @@ def resolve_assembly(
                 from .associated import validate_against_interface
 
                 provided = card["provides"]
-                validate_against_interface(card, interfaces[(provided["id"], provided["version"])])
+                validate_against_interface(
+                    card, interfaces[(provided["id"], provided["version"])]
+                )
             for alias in document["assembly"].get("type_libraries", []):
                 ref = cards[alias]["provides"]
                 if not interfaces[(ref["id"], ref["version"])]["types"]:
@@ -388,7 +390,9 @@ def resolve_assembly(
     }
 
 
-def lock_assembly(resolution: dict, repository, *, choice: int | None = None) -> dict:
+def lock_assembly(
+    resolution: dict, repository, *, choice: int | None = None, trust_keys=None
+) -> dict:
     if not isinstance(resolution, dict) or resolution.get("format") not in {
         "module-families-resolution",
         "module-families-synthesis",
@@ -481,26 +485,38 @@ def lock_assembly(resolution: dict, repository, *, choice: int | None = None) ->
     }
     if synthesis is not None:
         lock["synthesis"] = synthesis
+    if synthesis is not None and "evidence" in synthesis["request"]:
+        from .evidence import verify_receipt
+
+        if trust_keys is None:
+            raise AssemblyError(
+                "locking an evidence-selected program requires explicit evaluator trust keys"
+            )
+        receipt = copy.deepcopy(selected.get("evidence"))
+        verify_receipt(
+            lock, synthesis["request"]["evidence"], receipt, trust_keys=trust_keys
+        )
+        lock["evidence"] = receipt
     lock["sha256"] = _digest(lock)
-    verify_assembly(lock, repository)
+    verify_assembly(lock, repository, trust_keys=trust_keys)
     return lock
 
 
-def verify_assembly(lock: dict, repository=None) -> dict:
+def verify_assembly(lock: dict, repository=None, *, trust_keys=None) -> dict:
     """Check lock integrity, declarations and, when supplied, repository identity.
 
     Without a repository, hashes establish internal consistency only; they do
     not authenticate the source of the member cards or interface declarations.
     """
     try:
-        return _verify_assembly(lock, repository)
+        return _verify_assembly(lock, repository, trust_keys=trust_keys)
     except AssemblyError:
         raise
     except (ValueError, TypeError, KeyError) as error:
         raise AssemblyError(f"invalid assembly lock: {error}") from error
 
 
-def _verify_assembly(lock: dict, repository=None) -> dict:
+def _verify_assembly(lock: dict, repository=None, *, trust_keys=None) -> dict:
     if (
         not isinstance(lock, dict)
         or lock.get("format") != "module-families-assembly-lock"
@@ -509,7 +525,7 @@ def _verify_assembly(lock: dict, repository=None) -> dict:
         raise AssemblyError("expected a version-1 assembly lock")
     if _digest({k: v for k, v in lock.items() if k != "sha256"}) != lock.get("sha256"):
         raise AssemblyError("assembly lock hash mismatch")
-    if set(lock) - {"synthesis"} != {
+    if set(lock) - {"synthesis", "evidence"} != {
         "schema_version",
         "format",
         "name",
@@ -581,7 +597,9 @@ def _verify_assembly(lock: dict, repository=None) -> dict:
 
         provided = cards[alias]["provides"]
         try:
-            validate_against_interface(cards[alias], interface_specs[(provided["id"], provided["version"])])
+            validate_against_interface(
+                cards[alias], interface_specs[(provided["id"], provided["version"])]
+            )
         except ValueError as error:
             raise AssemblyError(f"{alias}: {error}") from error
     if set(signatures) != references:
@@ -665,7 +683,17 @@ def _verify_assembly(lock: dict, repository=None) -> dict:
     )
     if expected != lock["environment"]["requirements"]:
         raise AssemblyError("locked external requirements are incomplete")
-    return {"cards": cards, "signatures": signatures}
+    evidence_policy = lock.get("synthesis", {}).get("request", {}).get("evidence")
+    if (evidence_policy is not None) != ("evidence" in lock):
+        raise AssemblyError("locked evidence policy and receipt differ")
+    result = {"cards": cards, "signatures": signatures}
+    if evidence_policy is not None:
+        from .evidence import verify_receipt
+
+        result["evidence"] = verify_receipt(
+            lock, evidence_policy, lock["evidence"], trust_keys=trust_keys
+        )
+    return result
 
 
 @dataclass(frozen=True)
@@ -698,7 +726,12 @@ def instantiate(lock: dict, repository, target: str | Path) -> AssemblyInstance:
             checked["signatures"],
             types=fixed,
         )
-        return module.signature.seal(module, identity=f"assembly:{lock['sha256']}", indices=module.metadata()["indices"], associated=module.metadata()["associated"])
+        return module.signature.seal(
+            module,
+            identity=f"assembly:{lock['sha256']}",
+            indices=module.metadata()["indices"],
+            associated=module.metadata()["associated"],
+        )
 
     bundle = atomic_import(repository, lock["bindings"], target, link=link)
     return AssemblyInstance(bundle.value, bundle, lock["sha256"])

@@ -1,0 +1,58 @@
+{
+  "date": "2026-09-08",
+  "version": "0.6.0",
+  "python": "3.14.6",
+  "repository_schema": 3,
+  "tests": {
+    "passed": 567,
+    "subtests_passed": 32,
+    "seconds": 20.7,
+    "command": ".venv/bin/pytest -q --tb=short"
+  },
+  "ruff": "passed: src tests scripts examples adaptations/associated adaptations/knowledge adaptations/transactions",
+  "associated_types": {
+    "kinded_first_order_terms": true,
+    "interface_local_variables": true,
+    "provider_witnesses": true,
+    "graph_substitution": true,
+    "residual_open_equations": true,
+    "nested_publication": true,
+    "typed_export_projection": true,
+    "synthesis_and_lock_checks": true,
+    "runtime_preflight": true,
+    "generic_mfl_bodies": false,
+    "inferred_applicative_identity": false,
+    "generativity": false
+  },
+  "real_candidate": {
+    "report": "associated-types-validation.json",
+    "command": ".venv/bin/python examples/associated_system.py --work-dir .mf/associated-release --wheelhouse .mf/contribution-wheels",
+    "synthesis_status": "unique",
+    "program_sha256": "4a285044123ea9800ef77a4fa3a7afa4117ac7c7486cffdc164e658a7cf8dcfb",
+    "first_hits": [
+      "dogs",
+      "python"
+    ],
+    "rejected": [
+      "vector_space",
+      "document_identity"
+    ],
+    "copied_mari_source_unchanged": true
+  },
+  "release_wheel": {
+    "path": "dist/module-families/module_families-0.6.0-py3-none-any.whl",
+    "sha256": "f2439ee093b1fb350202d6bbd14eac1e441dac09f976ae17d6bbe3272aafba1a",
+    "built": true
+  },
+  "previous_measurements": {
+    "report": "final-validation-0.5.json",
+    "note": "Historical contribution workflow, typed SQLite, and earlier scale/migration measurements retained."
+  },
+  "limits": [
+    "Associated witnesses are declarations; arbitrary Python implementation behavior remains trusted.",
+    "Generic associated-value substitution within .mfl is explicitly rejected pending language integration.",
+    "Type identities are explicit or projected; applicative identity inference and fresh generative identities are not implemented.",
+    "Associated type sharing does not imply shared runtime instances.",
+    "The calculus has implementation tests, not a soundness proof or a million-agent benchmark."
+  ]
+}
