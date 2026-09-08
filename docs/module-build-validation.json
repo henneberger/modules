@@ -1,0 +1,69 @@
+{
+  "builds": [
+    {
+      "index": "/Users/henneberger/modules/.mf/knowledge-release/build/retrieval/index.json",
+      "member": "integrator.retrieval",
+      "open_ports": [
+        "data",
+        "embedding"
+      ],
+      "graph_sha256": "594dcf23a5ad486a5f402c04b7eccda0beedd6cd3c9767ecb8c9875700130898",
+      "wheel_sha256": "9b8a3b721c0f26372a427fb1027fb93ac1cc6d10cd22cb8b018abbcbfe100aae",
+      "artifacts": 6
+    },
+    {
+      "index": "/Users/henneberger/modules/.mf/knowledge-release/build/knowledge/index.json",
+      "member": "integrator.system",
+      "open_ports": [],
+      "graph_sha256": "f47516d3ea6fffd13be3e706bfa8a3e46439f08bd143b24980ef0eb7dec0fab0",
+      "wheel_sha256": "e71d1992f65ebf32c1b0a3fc7ed1a2f043856b089acba8bef238bda465113248",
+      "artifacts": 15
+    }
+  ],
+  "synthesis_status": "unique",
+  "program_sha256": "1a15a94b9c52dcfdea3afc4789a4c8e6df9cda828eba0937b02eda3d25637354",
+  "mari_source_sha256": "9ac592e50a56eb0d495fec7ba4b8a9f71e34574034dee657c5d7b9f19d75bac9",
+  "mari_source_unchanged": true,
+  "environment": {
+    "lock": "/Users/henneberger/modules/.mf/knowledge-release/environment/environment.lock.json",
+    "sha256": "f76ec163b7c1829869078b0f90bb9fe93f1aa0b3ee057e518e2c31de2fc6921b",
+    "wheels": 23,
+    "environment_locked": true
+  },
+  "replay": {
+    "assembly": "1a15a94b9c52dcfdea3afc4789a4c8e6df9cda828eba0937b02eda3d25637354",
+    "export": "run",
+    "result": [
+      [
+        {
+          "id": "dogs",
+          "text": "dogs are loyal pets and enjoy walks",
+          "relevance": 0.6546536707079772
+        },
+        {
+          "id": "storage",
+          "text": "sqlite stores documents in a database",
+          "relevance": 0.0
+        }
+      ],
+      [
+        {
+          "id": "python",
+          "text": "python modules compose reusable software",
+          "relevance": 0.7745966692414834
+        },
+        {
+          "id": "cats",
+          "text": "cats are independent pets and enjoy naps",
+          "relevance": 0.2182178902359924
+        }
+      ]
+    ]
+  },
+  "limits": [
+    "HashingVectorizer produces lexical feature vectors, not neural semantic embeddings",
+    "The harness is ThreadPoolExecutor, not an LLM reasoning agent",
+    "SQLite is an in-memory, explicitly closable candidate store",
+    "The example wires providers; it does not implement a universal model API"
+  ]
+}

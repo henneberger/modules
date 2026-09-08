@@ -1,0 +1,9 @@
+schema_version = 1
+
+[goal]
+name = "knowledge-search"
+requires = { id = "knowledge.system", version = "1" }
+capabilities = ["batch-retrieval", "diversified-retrieval", "cached-embeddings"]
+
+[policy]
+allowed_effects = ["caller-iteration", "memory", "threads"]

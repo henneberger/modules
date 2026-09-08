@@ -1,0 +1,73 @@
+schema_version = 1
+
+[family]
+description = "Composable knowledge retrieval and execution modules"
+name = "knowledge"
+version = "1.0.0"
+
+[publisher]
+name = "adapters"
+
+[source]
+license_files = ["../../LICENSE"]
+modules = ["knowledge_adapters.providers"]
+package = "knowledge_adapters"
+root = "../../adaptations/knowledge/src"
+
+[context]
+
+[external_dependencies]
+numpy = "numpy>=1.24.1"
+sklearn = "scikit-learn==1.8.0"
+
+[[members]]
+effects = ["memory"]
+id = "hashing"
+index_exports = { Space = "sklearn-1.8.0:HashingVectorizer:n1024:unsigned:l2:default-tokenizer" }
+kind = "module-factory"
+provides = { id = "knowledge.embedding", version = "1" }
+requires = {  }
+summary = "hashing"
+symbol = "knowledge_adapters.providers:hashing"
+version = "1.0.0"
+
+[[members]]
+effects = ["memory", "dependency-effects"]
+id = "cached_embedding"
+index_exports = { Space = { from = "base.Space" } }
+kind = "functor"
+provides = { id = "knowledge.embedding", version = "1" }
+requires = { base = { id = "knowledge.embedding", version = "1" } }
+summary = "cached embedding"
+symbol = "knowledge_adapters.providers:cached_embedding"
+version = "1.0.0"
+
+[[members]]
+effects = ["memory"]
+id = "sqlite_documents"
+kind = "module-factory"
+provides = { id = "knowledge.documents", version = "1" }
+requires = {  }
+summary = "sqlite documents"
+symbol = "knowledge_adapters.providers:sqlite_documents"
+version = "1.0.0"
+
+[[members]]
+effects = ["dependency-effects"]
+id = "retrieval"
+kind = "functor"
+provides = { id = "knowledge.retrieval", version = "1" }
+requires = { data = { id = "knowledge.documents", version = "1" }, embedding = { id = "knowledge.embedding", version = "1" }, ranker = { id = "knowledge.ranker", version = "1" } }
+summary = "retrieval"
+symbol = "knowledge_adapters.providers:retrieval"
+version = "1.0.0"
+
+[[members]]
+effects = ["threads", "dependency-effects"]
+id = "threaded_queries"
+kind = "functor"
+provides = { id = "knowledge.batch", version = "1" }
+requires = { data = { id = "knowledge.documents", version = "1" }, retrieval = { id = "knowledge.retrieval", version = "1" } }
+summary = "threaded queries"
+symbol = "knowledge_adapters.providers:threaded_queries"
+version = "1.0.0"

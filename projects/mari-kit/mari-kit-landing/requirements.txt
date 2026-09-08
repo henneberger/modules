@@ -1,0 +1,6 @@
+furo>=2024.8
+myst-parser>=3
+sphinx>=7
+sphinx-copybutton>=0.5
+sphinx-inline-tabs>=2023.4.21
+sphinx-toolbox>=3.5

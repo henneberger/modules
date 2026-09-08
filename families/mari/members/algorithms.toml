@@ -1,0 +1,40 @@
+[[members]]
+avoid_when = ["Chunks must respect semantic text or document structure."]
+effects = ["caller-stream-read"]
+id = "algorithms.compression.fastcdc_chunks"
+kind = "algorithm"
+metadata_basis = ["curated-from-source-and-workload-guide"]
+solves = ["Split byte streams into content-defined chunks for incremental deduplication."]
+tags = ["fastcdc", "deduplication", "chunking", "bytes"]
+use_when = ["Byte boundaries should tolerate insertions and be independent of stream read sizes."]
+
+[[members]]
+avoid_when = ["You require semantic matching without term overlap; L/Plus nonmatches can score above zero."]
+id = "algorithms.lexical.BM25VariantIndex"
+kind = "algorithm"
+metadata_basis = ["curated-from-source-and-workload-guide"]
+solves = ["Compare Okapi, BM25L, and BM25Plus lexical ranking over supplied tokens."]
+tags = ["bm25", "okapi", "bm25l", "bm25plus", "lexical-search"]
+use_when = ["Token frequency and document length are useful relevance signals."]
+
+[[members]]
+avoid_when = ["You cannot establish the objective assumptions required by the selected optimizer."]
+effects = ["caller-callback"]
+id = "algorithms.subsets.maximize_subset"
+kind = "algorithm"
+metadata_basis = ["curated-from-source-and-workload-guide"]
+solves = ["Choose a bounded subset using naive, lazy, stochastic, or lazier greedy search."]
+tags = ["greedy", "submodular", "subset-selection", "coverage", "diversity"]
+use_when = ["An explicit objective quantifies coverage or diversity; lazy modes need submodularity."]
+
+[[members]]
+avoid_when = ["Freshness alone must establish factual validity or proof."]
+effects = []
+id = "algorithms.temporal.recency_decay"
+kind = "algorithm"
+provides = { id = "ranking.recency", version = "1" }
+capabilities = ["freshness", "exponential-decay"]
+metadata_basis = ["curated-from-source-and-workload-guide"]
+solves = ["Convert age in days into an explicit freshness ranking signal."]
+tags = ["recency", "freshness", "exponential", "half-life", "temporal-ranking"]
+use_when = ["Compare linear, exponential half-life, and neutral recency policies."]

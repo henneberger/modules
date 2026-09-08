@@ -1,0 +1,26 @@
+schema_version = 1
+
+[family]
+description = "Composable knowledge retrieval and execution modules"
+name = "knowledge"
+version = "1.0.0"
+
+[publisher]
+name = "mari"
+
+[source]
+license_files = ["../../projects/mari-kit/LICENSE.md", "../../projects/mari-kit/THIRD_PARTY_NOTICES.md"]
+modules = ["mark_kit.retrieval.fusion"]
+package = "mark_kit"
+root = "../../projects/mari-kit/src"
+
+[context]
+
+[[members]]
+effects = ["caller-iteration"]
+id = "mmr"
+kind = "algorithm"
+provides = { id = "knowledge.ranker", version = "1" }
+summary = "Unmodified Mari maximal marginal relevance"
+symbol = "mark_kit.retrieval.fusion:maximal_marginal_relevance"
+version = "1.0.0"

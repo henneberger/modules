@@ -1,0 +1,48 @@
+schema_version = 1
+members = []
+
+[family]
+description = "Composable knowledge retrieval and execution modules"
+name = "knowledge"
+version = "1.0.0"
+
+[publisher]
+name = "interfaces"
+
+[context]
+
+[[interfaces]]
+callables = { embed = { asynchronous = false, parameters = [{ kind = "POSITIONAL_OR_KEYWORD", name = "texts", required = true }] } }
+id = "knowledge.embedding"
+types = []
+version = "1"
+
+[[interfaces]]
+callables = { close = { asynchronous = false, parameters = [] }, load = { asynchronous = false, parameters = [{ kind = "POSITIONAL_OR_KEYWORD", name = "documents", required = true }] }, read = { asynchronous = false, parameters = [] } }
+id = "knowledge.documents"
+types = []
+version = "1"
+
+[[interfaces]]
+callables = { search = { asynchronous = false, parameters = [{ kind = "POSITIONAL_OR_KEYWORD", name = "query", required = true }, { kind = "POSITIONAL_OR_KEYWORD", name = "limit", required = true }] } }
+id = "knowledge.retrieval"
+types = []
+version = "1"
+
+[[interfaces]]
+callables = { run = { asynchronous = false, parameters = [{ kind = "POSITIONAL_OR_KEYWORD", name = "documents", required = true }, { kind = "POSITIONAL_OR_KEYWORD", name = "queries", required = true }, { kind = "POSITIONAL_OR_KEYWORD", name = "limit", required = true }] } }
+id = "knowledge.batch"
+types = []
+version = "1"
+
+[[interfaces]]
+callables = { close = { asynchronous = false, parameters = [] }, run = { asynchronous = false, parameters = [{ kind = "POSITIONAL_OR_KEYWORD", name = "documents", required = true }, { kind = "POSITIONAL_OR_KEYWORD", name = "queries", required = true }, { kind = "POSITIONAL_OR_KEYWORD", name = "limit", required = true }] } }
+id = "knowledge.system"
+types = []
+version = "1"
+
+[[interfaces]]
+callables = { rank = { asynchronous = false, parameters = [{ kind = "POSITIONAL_OR_KEYWORD", name = "relevance", required = true }, { kind = "POSITIONAL_OR_KEYWORD", name = "similarity", required = true }, { kind = "KEYWORD_ONLY", name = "limit", required = true }, { kind = "KEYWORD_ONLY", name = "relevance_weight", required = false }] } }
+id = "knowledge.ranker"
+types = []
+version = "1"

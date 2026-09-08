@@ -1,0 +1,17 @@
+schema_version = 1
+name = "boltons-iterators"
+
+[source]
+root = "../projects/boltons"
+package = "boltons"
+
+[review]
+reason = "Preserve chunked_iter, unique_iter, is_iterable, and _validate_positive_int verbatim. These selected definitions require only itertools and their explicit local helpers; they do not reference sentinels initialized by the omitted top-level compatibility try statement. Preserve Boltons' distinct string chunk and integer-coercion behavior; shared contracts narrow the supported comparison domain."
+omit_unselected = true
+empty_package_initializers = true
+
+[[modules]]
+name = "boltons.iterutils"
+sha256 = "229f0f767aa3ca9fbc0b057dd7191170815bffb43599d3a293a246bd5a75afb6"
+declarations = ["chunked_iter", "unique_iter", "is_iterable", "_validate_positive_int"]
+imports = ["itertools"]

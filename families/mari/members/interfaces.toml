@@ -1,0 +1,5 @@
+[[interfaces]]
+id = "ranking.recency"
+version = "1"
+types = []
+callables = { decay = { asynchronous = false, parameters = [{ name = "days", kind = "POSITIONAL_ONLY", required = true }, { name = "method", kind = "KEYWORD_ONLY", required = false }, { name = "half_life", kind = "KEYWORD_ONLY", required = false }] } }

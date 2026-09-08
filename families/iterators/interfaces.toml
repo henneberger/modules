@@ -1,0 +1,26 @@
+schema_version = 1
+
+[family]
+description = "Existing iterator algorithms for ordered cleanup, bounded batches, and streaming workflows."
+name = "iterators"
+version = "0.1.0"
+
+[publisher]
+name = "interfaces"
+
+[context]
+contract_limits = ["Call-shape compatibility does not enforce iterable element types or result laws.", "Boltons preserves str/bytes chunks; more-itertools returns lists. String and bytes chunking is outside the shared chunker law.", "Invalid-size behavior is provider-specific and tested against each upstream implementation."]
+selection_guidance = ["Use the shared chunking law for non-string iterables and strictly positive integer sizes only.", "Unique providers retain the first occurrence of each hashable item.", "These operations consume caller-supplied iterators; iteration itself may have effects."]
+solves = ["Deduplicate ordered records without sorting", "Split cleaned records into bounded batches"]
+
+[[interfaces]]
+callables = { chunk = { asynchronous = false, parameters = [{ kind = "POSITIONAL_ONLY", name = "items", required = true }, { kind = "POSITIONAL_ONLY", name = "size", required = true }] } }
+id = "iterators.chunker"
+types = []
+version = "1"
+
+[[interfaces]]
+callables = { unique = { asynchronous = false, parameters = [{ kind = "POSITIONAL_ONLY", name = "items", required = true }] } }
+id = "iterators.unique"
+types = []
+version = "1"

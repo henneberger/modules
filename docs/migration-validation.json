@@ -1,0 +1,21 @@
+{
+  "adaptations": [
+    "Original import paths are synthetic namespaces delegating to verified wheel cells.",
+    "The polar_scores monkeypatch forwards to search_index's compiled global binding."
+  ],
+  "artifacts": 2322,
+  "excluded_files": [
+    "tests/test_architecture.py"
+  ],
+  "experiment": "copied Mari semantic suite against extracted wheel cells",
+  "members": 988,
+  "original_package_modules_executed": [],
+  "pytest_exit_code": 0,
+  "python": "3.13.3",
+  "results": {
+    "passed": 429
+  },
+  "schema_version": 1,
+  "seconds": 6.332,
+  "source_digest": "6eabd74fa608dd0a5f4986efc4b6e23704d146260f7ca69e9f090a3210e837eb"
+}

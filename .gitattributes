@@ -1,0 +1,7 @@
+# Preserve the bytes of copied upstream source and provenance files.
+projects/** -text -whitespace
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary

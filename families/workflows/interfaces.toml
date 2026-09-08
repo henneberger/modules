@@ -1,0 +1,18 @@
+schema_version = 1
+
+[family]
+name = "workflows"
+version = "1.0.0"
+description = "Composable record processing and evidence ranking workflows."
+
+[publisher]
+name = "interfaces"
+
+[context]
+solves = ["Construct processing programs from independently supplied algorithm modules"]
+
+[[interfaces]]
+id = "workflows.batch_pipeline"
+version = "1"
+types = []
+callables = { run = { parameters = [{name = "items", kind = "POSITIONAL_ONLY", required = true}, {name = "size", kind = "POSITIONAL_ONLY", required = true}], asynchronous = false } }

@@ -1,0 +1,194 @@
+schema_version = 1
+
+[publisher]
+name = "fixture"
+
+[family]
+description = "Independent local payment simulation algorithms, replaceable processors, and shared nominal records."
+name = "payments"
+version = "0.1.0"
+
+[source]
+license_files = []
+package = "payments_demo"
+root = "project/src"
+
+[context]
+conventions = ["Amounts use integer minor units.", "Supported currencies are USD and EUR.", "Processor construction is explicit and creates fresh local state.", "No family-wide installation dependency."]
+selection_guidance = ["Choose the payments.processor contract for charging; payments.refund is a distinct operation.", "Alpha provides dictionary lookup; Beta provides an inspectable linear receipt log.", "Both processors are fake, retain state only in memory, and are not real financial integrations.", "Shared family membership does not establish substitutability; bind exact contracts and shared nominal types."]
+solves = ["Compose a checkout with a selected local processor.", "Calculate a refund from a simulated payment receipt."]
+
+[external_dependencies]
+
+[[members]]
+avoid_when = ["A real payment or persistent state is required."]
+contract_target = "module-returned-by-zero-argument-factory"
+effects = ["local-state"]
+id = "processors.alpha"
+implementation = { lookup = "dictionary" }
+kind = "module-factory"
+metadata_basis = ["author-declaration", "shared-behavior-example"]
+provides = { id = "payments.processor", version = "1" }
+solves = ["Simulate idempotent local charges."]
+summary = "Create a fake processor with dictionary-based idempotency lookup."
+symbol = "payments_demo.alpha:alpha_processor"
+tags = ["payments", "processor", "charge", "dictionary", "simulation"]
+use_when = ["Constant-time key lookup is useful for local checkout tests."]
+
+[[members]]
+avoid_when = ["A real payment, persistent state, or large-scale lookup is required."]
+contract_target = "module-returned-by-zero-argument-factory"
+effects = ["local-state"]
+id = "processors.beta"
+implementation = { lookup = "linear-log" }
+kind = "module-factory"
+metadata_basis = ["author-declaration", "shared-behavior-example"]
+provides = { id = "payments.processor", version = "1" }
+solves = ["Simulate idempotent local charges."]
+summary = "Create a fake processor with an ordered receipt log and linear lookup."
+symbol = "payments_demo.beta:beta_processor"
+tags = ["payments", "processor", "charge", "log", "simulation"]
+use_when = ["An ordered receipt log is useful in a small local simulation."]
+
+[[members]]
+avoid_when = ["A real refund request or partial-refund policy is required."]
+contract_target = "callable-export"
+effects = []
+id = "refunds.full"
+kind = "algorithm"
+metadata_basis = ["author-declaration"]
+provides = { id = "payments.refund", version = "1" }
+solves = ["Calculate a refund from a supplied receipt."]
+summary = "Calculate a full simulated refund for a receipt without external effects."
+symbol = "payments_demo.refunds:full_refund"
+tags = ["payments", "refund", "simulation"]
+use_when = ["The full original amount should be returned in a local simulation."]
+
+[[members]]
+effects = []
+id = "types.Money"
+kind = "type"
+metadata_basis = ["author-declaration"]
+summary = "Shared amount in integer minor units with a currency code."
+symbol = "payments_demo.types:Money"
+tags = ["payments", "type", "money"]
+
+[[members]]
+effects = []
+id = "types.Receipt"
+kind = "type"
+metadata_basis = ["author-declaration"]
+summary = "Shared simulated charge receipt with processor and request identity."
+symbol = "payments_demo.types:Receipt"
+tags = ["payments", "type", "receipt"]
+
+[[members]]
+effects = []
+id = "types.Refund"
+kind = "type"
+metadata_basis = ["author-declaration"]
+summary = "Shared local refund calculation referencing an original receipt."
+symbol = "payments_demo.types:Refund"
+tags = ["payments", "type", "refund"]
+
+[[members]]
+effects = []
+id = "validation.charge"
+kind = "operation"
+metadata_basis = ["author-declaration"]
+summary = "Validate supported currency, positive integer amount, and an idempotency key."
+symbol = "payments_demo.types:validate_charge"
+tags = ["payments", "validation", "charge"]
+
+[[members]]
+effects = []
+id = "types.PaymentError"
+kind = "type"
+metadata_basis = ["author-declaration"]
+summary = "Shared nominal exception for local payment failures."
+symbol = "payments_demo.types:PaymentError"
+tags = ["payments", "type", "error"]
+
+[[members]]
+effects = []
+id = "types.TransientPaymentError"
+kind = "type"
+metadata_basis = ["author-declaration"]
+summary = "Shared nominal exception for this fake provider's failures before effects."
+symbol = "payments_demo.types:TransientPaymentError"
+tags = ["payments", "type", "error", "transient"]
+
+[[members]]
+contract_target = "module-returned-by-zero-argument-factory"
+effects = []
+id = "types.library"
+kind = "module-factory"
+metadata_basis = ["author-declaration"]
+provides = { id = "payments.types", version = "1" }
+summary = "Construct a reusable library of coherent payment data and exception types."
+symbol = "payments_demo.types:types_library"
+tags = ["payments", "types", "library", "sharing"]
+
+[[members]]
+avoid_when = ["Used without retry/idempotency wrappers or for real payments."]
+behavior = { idempotency = "none", transient_failures = "once per key, always before the effect" }
+contract_target = "module-returned-by-zero-argument-factory"
+effects = ["local-state"]
+id = "services.flaky"
+kind = "module-factory"
+metadata_basis = ["author-declaration", "composition-behavior-example"]
+provides = { id = "payments.charge-service", version = "1" }
+summary = "Create a fake charge service that fails once before effects and has no request idempotency."
+symbol = "payments_demo.services:flaky_processor"
+tags = ["payments", "charge-service", "transient", "simulation"]
+use_when = ["Testing retry and idempotency module compositions."]
+
+[[members]]
+contract_target = "module-returned-by-zero-argument-factory"
+effects = ["local-state"]
+id = "ledgers.memory"
+kind = "module-factory"
+metadata_basis = ["author-declaration"]
+provides = { id = "payments.ledger", version = "1" }
+summary = "Create a local receipt ledger with record and snapshot operations."
+symbol = "payments_demo.composition:memory_ledger"
+tags = ["payments", "ledger", "local-state"]
+
+[[members]]
+behavior = { attempt_limit = 3, requires = "transient errors occur before effects" }
+contract_target = "module-returned-by-named-module-factory"
+effects = ["dependency-effects"]
+id = "wrappers.retry"
+kind = "functor"
+metadata_basis = ["author-declaration", "composition-behavior-example"]
+provides = { id = "payments.charge-service", version = "1" }
+requires = { processor = { id = "payments.charge-service", version = "1" } }
+summary = "Produce a charge service that retries pre-effect transient failures up to three times."
+symbol = "payments_demo.composition:retry_processor"
+tags = ["payments", "composition", "retry"]
+
+[[members]]
+contract_target = "module-returned-by-named-module-factory"
+effects = ["dependency-effects"]
+id = "wrappers.ledger"
+kind = "functor"
+metadata_basis = ["author-declaration", "composition-behavior-example"]
+provides = { id = "payments.charge-service", version = "1" }
+requires = { ledger = { id = "payments.ledger", version = "1" }, processor = { id = "payments.charge-service", version = "1" } }
+sharing = [["processor.Receipt", "ledger.Receipt"], ["processor.Money", "ledger.Money"], ["processor.PaymentError", "ledger.PaymentError"]]
+summary = "Produce a charge service that records each successful downstream receipt in a supplied ledger."
+symbol = "payments_demo.composition:ledger_processor"
+tags = ["payments", "composition", "ledger"]
+
+[[members]]
+behavior = { failure_after_effect_recovery = false, scope = "live module instance" }
+contract_target = "module-returned-by-named-module-factory"
+effects = ["local-state", "dependency-effects"]
+id = "wrappers.idempotency"
+kind = "functor"
+metadata_basis = ["author-declaration", "composition-behavior-example"]
+provides = { id = "payments.charge-service", version = "1" }
+requires = { processor = { id = "payments.charge-service", version = "1" } }
+summary = "Produce a charge service with thread-safe, process-local memoization of successful keyed requests."
+symbol = "payments_demo.composition:idempotent_processor"
+tags = ["payments", "composition", "idempotency"]

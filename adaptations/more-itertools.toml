@@ -1,0 +1,23 @@
+schema_version = 1
+name = "more-itertools-iterators"
+
+[source]
+root = "../projects/more-itertools"
+package = "more_itertools"
+
+[review]
+reason = "Preserve chunked, take, and unique_everseen verbatim. These selected definitions use partial, take, islice, and filterfalse; they do not require the omitted version-dependent numerical helpers or package-wide export initializer. Behavioral evidence is scoped to the published iterator contracts."
+omit_unselected = true
+empty_package_initializers = true
+
+[[modules]]
+name = "more_itertools.more"
+sha256 = "f2ad17370b06905e981b524213395f0dee3d072e9c3ddab3d65e671f324e5ace"
+declarations = ["chunked"]
+imports = ["partial", "take"]
+
+[[modules]]
+name = "more_itertools.recipes"
+sha256 = "6aff1f84b0a70b96c102e3b92a70539255f1489765fc54140b1c1478f95b4828"
+declarations = ["take", "unique_everseen"]
+imports = ["islice", "filterfalse"]

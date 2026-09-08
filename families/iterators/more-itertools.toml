@@ -1,0 +1,49 @@
+schema_version = 1
+
+[family]
+description = "Existing iterator algorithms for ordered cleanup, bounded batches, and streaming workflows."
+name = "iterators"
+version = "0.1.0"
+
+[publisher]
+name = "more-itertools"
+
+[source]
+license_files = ["../../projects/more-itertools/more_itertools-11.1.0.dist-info/licenses/LICENSE"]
+modules = ["more_itertools.more", "more_itertools.recipes"]
+package = "more_itertools"
+root = "../../adaptations/generated/more-itertools"
+
+[discovery]
+public = false
+
+[context]
+contract_limits = ["Call-shape compatibility does not enforce iterable element types or result laws.", "Boltons preserves str/bytes chunks; more-itertools returns lists. String and bytes chunking is outside the shared chunker law.", "Invalid-size behavior is provider-specific and tested against each upstream implementation."]
+selection_guidance = ["Use the shared chunking law for non-string iterables and strictly positive integer sizes only.", "Unique providers retain the first occurrence of each hashable item.", "These operations consume caller-supplied iterators; iteration itself may have effects."]
+solves = ["Deduplicate ordered records without sorting", "Split cleaned records into bounded batches"]
+
+[[members]]
+avoid_when = ["String-preserving chunks are required", "Identical invalid-size behavior across providers is required"]
+capabilities = ["batch"]
+effects = ["caller-iteration"]
+id = "chunked"
+kind = "algorithm"
+provides = { id = "iterators.chunker", version = "1" }
+solves = ["Batch cleaned iterable records"]
+summary = "Yield lists of bounded size using the original more-itertools chunked implementation."
+symbol = "more_itertools.more:chunked"
+use_when = ["The input is a non-string iterable and the batch size is a strictly positive integer"]
+version = "11.1.0"
+
+[[members]]
+avoid_when = ["The iterable is unbounded and an unbounded seen set is unacceptable"]
+capabilities = ["deduplicate"]
+effects = ["caller-iteration"]
+id = "unique"
+kind = "algorithm"
+provides = { id = "iterators.unique", version = "1" }
+solves = ["Remove repeated records while preserving order"]
+summary = "Retain the first occurrence of each hashable item using more-itertools unique_everseen."
+symbol = "more_itertools.recipes:unique_everseen"
+use_when = ["Items are hashable and first-occurrence order matters"]
+version = "11.1.0"

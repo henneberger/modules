@@ -1,0 +1,1300 @@
+/* ==========================================================================
+   Mari Kit docs: the mari.guru/docs Blueprint shell, rebuilt on furo.
+
+   Ground truth: mari-docs/dist/canon/style.css (shell measurements) and
+   mari-web/design-tokens.json (palette). Tokens are --mk-*; furo's own
+   --color-* variables are mapped to the same palette in conf.py.
+
+   Rules of the file:
+   - border-radius 0 everywhere except inline code (2px, as in the docs shell)
+   - 1.5px lines for the shell, 1px for table cells and cards
+   - no gradients, no rounded pills, no drop shadows on cards
+   - nothing here touches .diagram; that lives in diagrams.css
+   ========================================================================== */
+
+/* ---- tokens ------------------------------------------------------------- */
+
+body {
+  --mk-bg: #ffffff;
+  --mk-card: #f7f8fa;
+  --mk-flysch: #f0f2f5;
+  --mk-ink: #10263b;
+  --mk-ink-rgb: 16, 38, 59;
+  --mk-line: #d4d5d8;
+  --mk-edge: #10263b;
+  --mk-accent: #1e6fa8;
+  --mk-link: #1e6fa8;
+  --mk-biscay: #1c3f60;
+  --mk-espelette: #b23a1e;
+  --mk-moss: #2c6e49;
+  --mk-clay: #a05e1c;
+  --mk-muted: #5d6b79;
+  --mk-faint: #71808f;
+  --mk-down: #e8f1f9;
+  --mk-code-bg: #26231c;
+  --mk-code-fg: #f3ecd9;
+  --mk-dot: rgba(0, 0, 0, 0.14);
+  --mk-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --mk-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --mk-header-h: 57.5px; /* 14px padding x2 + 28px toggle + 1.5px border */
+  --mk-sidebar-w: 250px;
+  --mk-content-w: 760px;
+  --mk-radius: 0;
+}
+
+@media not print {
+  body[data-theme="dark"] {
+    --mk-bg: #0e2032;
+    --mk-card: #0a1926;
+    --mk-flysch: #12293d;
+    --mk-ink: #eaf0f5;
+    --mk-ink-rgb: 234, 240, 245;
+    --mk-line: #2d4356;
+    --mk-edge: #7a93a9;
+    --mk-link: #6fb1e6;
+    --mk-biscay: #6fb1e6;
+    --mk-espelette: #e8805e;
+    --mk-moss: #5fb98a;
+    --mk-clay: #d6944f;
+    --mk-muted: #b9c6d2;
+    --mk-faint: #8497a6;
+    --mk-down: #14324c;
+    --mk-dot: rgba(255, 255, 255, 0.09);
+  }
+  @media (prefers-color-scheme: dark) {
+    body:not([data-theme="light"]) {
+      --mk-bg: #0e2032;
+      --mk-card: #0a1926;
+      --mk-flysch: #12293d;
+      --mk-ink: #eaf0f5;
+      --mk-ink-rgb: 234, 240, 245;
+      --mk-line: #2d4356;
+      --mk-edge: #7a93a9;
+      --mk-link: #6fb1e6;
+      --mk-biscay: #6fb1e6;
+      --mk-espelette: #e8805e;
+      --mk-moss: #5fb98a;
+      --mk-clay: #d6944f;
+      --mk-muted: #b9c6d2;
+      --mk-faint: #8497a6;
+      --mk-down: #14324c;
+      --mk-dot: rgba(255, 255, 255, 0.09);
+    }
+  }
+}
+
+/* ---- base --------------------------------------------------------------- */
+
+html {
+  font-size: 100% !important; /* furo bumps to 110% on very wide screens; the shell is px-based */
+  scroll-padding-top: calc(var(--mk-header-h) + 12px);
+}
+
+body {
+  /* furo sets body height: 100%, which caps how far a sticky header can
+     travel; let the body grow with the page so the header sticks throughout */
+  height: auto;
+  min-height: 100%;
+  background: var(--mk-bg);
+  color: var(--mk-ink);
+  font-family: var(--mk-sans);
+  line-height: 1.6;
+}
+
+* {
+  border-radius: 0;
+}
+
+/* ---- top header (furo announcement block, see _templates/page.html) ---- */
+
+.announcement,
+.announcement-content {
+  display: contents;
+}
+
+.mk-header {
+  position: sticky;
+  top: 0;
+  z-index: 60; /* above furo's drawers (30 and 50), which are flex items with z-index */
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: var(--mk-header-h);
+  box-sizing: border-box;
+  padding: 14px 28px;
+  border-bottom: 1.5px solid var(--mk-line);
+  background: var(--mk-card);
+  color: var(--mk-ink);
+  font-family: var(--mk-sans);
+  white-space: nowrap;
+}
+
+.mk-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  text-decoration: none;
+  font: 600 17px var(--mk-sans);
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.mk-logo .mari-mark,
+.mk-brand .mari-mark {
+  color: var(--mk-ink);
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+.mk-nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font: 13.5px var(--mk-sans);
+}
+
+.mk-nav a {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.75;
+}
+
+.mk-nav a:hover {
+  opacity: 1;
+  color: var(--mk-link);
+}
+
+.mk-nightmode,
+.mk-header .theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0;
+  border: 1.5px solid var(--mk-line);
+  background: var(--mk-card);
+  color: inherit;
+  cursor: pointer;
+}
+
+.mk-nightmode:hover {
+  border-color: var(--mk-link);
+  color: var(--mk-link);
+}
+
+.mk-nightmode svg {
+  width: 15px;
+  height: 15px;
+  color: inherit;
+}
+
+.mk-menu {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: -4px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mk-menu svg {
+  display: block;
+}
+
+/* "On this page" opener; furo hides the drawer below 82em and moves the
+   opener into its mobile header below 63em, so ours takes over there */
+.mk-header .mk-toc {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mk-header .mk-toc svg {
+  display: block;
+}
+
+.mk-header .mk-toc.no-toc {
+  display: none;
+}
+
+/* furo's own mobile header is replaced by .mk-header at every width */
+.mobile-header {
+  display: none !important;
+}
+
+.skip-to-content {
+  border-radius: 0;
+  border: 1.5px solid var(--mk-line);
+}
+
+/* ---- layout ------------------------------------------------------------- */
+
+.page {
+  min-height: calc(100vh - var(--mk-header-h));
+}
+
+.main {
+  flex: 1;
+  justify-content: flex-start;
+  background-image: radial-gradient(var(--mk-dot) 1px, transparent 1.4px);
+  background-size: 14px 14px;
+}
+
+.content {
+  width: 100%;
+  max-width: calc(var(--mk-content-w) + 84px);
+  flex: 0 1 calc(var(--mk-content-w) + 84px);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 36px 42px;
+  background: var(--mk-bg);
+}
+
+.article-container {
+  width: 100%;
+}
+
+.content-icon-container {
+  margin: 0 0 0 1rem;
+}
+
+/* the header carries the night toggle; hide furo's in-content copy */
+.theme-toggle-content {
+  display: none;
+}
+
+/* ---- sidebar ------------------------------------------------------------ */
+
+.sidebar-drawer {
+  width: var(--mk-sidebar-w);
+  min-width: var(--mk-sidebar-w);
+  justify-content: flex-start;
+  border-right: 1.5px solid var(--mk-line);
+  background: var(--mk-card);
+}
+
+.sidebar-container {
+  width: var(--mk-sidebar-w);
+}
+
+.sidebar-sticky {
+  box-sizing: border-box;
+  top: var(--mk-header-h);
+  height: calc(100vh - var(--mk-header-h));
+  padding: 28px 18px 18px;
+}
+
+.mk-brand {
+  /* The top header carries the logo at every width and stays visible above
+     the mobile drawer, so the sidebar brand is rendered for structure but
+     never shown. Flip this to inline-flex if the header ever goes away. */
+  display: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 0;
+  color: var(--mk-ink);
+  text-decoration: none;
+  font: 600 17px var(--mk-sans);
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.sidebar-search-container {
+  margin: 0 0 18px;
+  background: transparent;
+}
+
+.sidebar-search-container:hover,
+.sidebar-search-container:focus-within {
+  background: transparent;
+}
+
+.sidebar-search-container::before {
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  color: var(--mk-faint);
+}
+
+.sidebar-search {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 10px 6px 30px;
+  border: 1.5px solid var(--mk-line);
+  background: var(--mk-bg);
+  color: var(--mk-ink);
+  font: 13.5px var(--mk-sans);
+}
+
+.sidebar-search:focus {
+  border-color: var(--mk-link);
+}
+
+.sidebar-search::placeholder {
+  color: var(--mk-faint);
+  font-size: 13.5px;
+}
+
+.sidebar-scroll {
+  overflow-x: hidden;
+  scroll-behavior: auto;
+  overscroll-behavior-y: contain;
+}
+
+.sidebar-tree {
+  margin: 0;
+  font-size: 14px;
+}
+
+.sidebar-tree ul,
+.sidebar-tree li > ul {
+  margin: 0;
+  padding: 0;
+}
+
+/* every section stays open, like the docs shell's flat list */
+.sidebar-tree .toctree-checkbox ~ ul,
+.sidebar-tree li > ul {
+  display: block;
+}
+
+.sidebar-tree label {
+  display: none;
+}
+
+.sidebar-tree li.has-children > .reference {
+  padding-right: 10px;
+}
+
+.sidebar-tree .reference {
+  display: block;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  color: var(--mk-ink);
+  text-decoration: none;
+  font: 14px/1.4 var(--mk-sans);
+  opacity: 0.8;
+}
+
+.sidebar-tree .reference:hover {
+  background: rgba(30, 111, 168, 0.09);
+  color: var(--mk-ink);
+  opacity: 1;
+}
+
+.sidebar-tree .current-page > .reference,
+.sidebar-tree .current-page > .reference:hover {
+  background: rgba(30, 111, 168, 0.14);
+  color: var(--mk-link);
+  font-weight: 600;
+  opacity: 1;
+}
+
+/* top-level toctree entries are the section labels */
+.sidebar-tree .toctree-l1 > .reference {
+  margin: 28px 0 10px;
+  padding: 12px 10px;
+  border-top: 2px solid var(--mk-line);
+  border-left: 5px solid var(--mk-link);
+  background: var(--mk-down);
+  color: var(--mk-ink);
+  font: 700 18px/1.35 var(--mk-sans);
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 1;
+}
+
+.sidebar-tree > ul > li:first-child > .reference {
+  margin-top: 0;
+}
+
+.sidebar-tree .toctree-l1 > .reference:hover {
+  background: var(--mk-down);
+  color: var(--mk-link);
+  opacity: 1;
+}
+
+.sidebar-tree .toctree-l1.current-page > .reference {
+  color: var(--mk-link);
+  opacity: 1;
+}
+
+.sidebar-tree .caption,
+.sidebar-tree :not(.caption) > .caption-text {
+  margin: 28px 0 10px;
+  padding: 12px 10px;
+  color: var(--mk-ink);
+  font: 700 18px/1.35 var(--mk-sans);
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 1;
+}
+
+.sidebar-tree .reference:focus-visible {
+  outline: 2px solid var(--mk-link);
+  outline-offset: -2px;
+  opacity: 1;
+}
+
+.sidebar-tree .toctree-l3 > .reference {
+  padding-left: 22px;
+  font-size: 13px;
+}
+
+/* ---- right-hand "On this page" ----------------------------------------- */
+
+.toc-drawer {
+  background: var(--mk-bg);
+  padding-right: 1rem;
+}
+
+.toc-sticky {
+  top: var(--mk-header-h);
+  height: calc(100vh - var(--mk-header-h));
+  padding-top: 36px;
+  box-sizing: border-box;
+}
+
+.toc-title-container {
+  padding: 0;
+}
+
+.toc-title {
+  padding-left: 14px;
+  color: var(--mk-ink);
+  font: 600 11px var(--mk-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+}
+
+.toc-tree {
+  border-left: 1.5px solid var(--mk-line);
+  padding-left: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.toc-tree ul {
+  padding-left: 14px;
+}
+
+.toc-tree li {
+  padding-top: 6px;
+}
+
+.toc-tree a.reference {
+  color: var(--mk-muted);
+}
+
+.toc-tree a.reference:hover {
+  color: var(--mk-ink);
+}
+
+.toc-tree li.scroll-current > .reference {
+  color: var(--mk-link);
+  font-weight: 600;
+}
+
+/* ---- article typography ------------------------------------------------- */
+
+article[role="main"] {
+  color: var(--mk-ink);
+  font: 16px/1.6 var(--mk-sans);
+}
+
+article h1,
+article h2,
+article h3,
+article h4,
+article h5,
+article h6 {
+  margin-left: 0;
+  margin-right: 0;
+  padding: 0;
+  border-radius: 0;
+  color: var(--mk-ink);
+  font-family: var(--mk-sans);
+}
+
+article h1 {
+  margin: 0 0 14px;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+article h2 {
+  margin: 28px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--mk-line);
+  font-size: 23px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+article h3 {
+  margin: 20px 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+article h4 {
+  margin: 16px 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+article p {
+  margin: 10px 0;
+}
+
+article ul,
+article ol {
+  margin: 10px 0;
+  padding-left: 1.4em;
+}
+
+article li + li {
+  margin-top: 4px;
+}
+
+article a {
+  color: var(--mk-link);
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--mk-ink-rgb), 0.25);
+  text-underline-offset: 2px;
+}
+
+article a:hover {
+  color: var(--mk-biscay);
+  text-decoration-color: currentColor;
+}
+
+article .headerlink {
+  color: var(--mk-link);
+  text-decoration: none;
+  font-weight: 400;
+}
+
+article strong {
+  font-weight: 600;
+}
+
+article hr {
+  margin: 28px 0;
+  border: 0;
+  border-top: 1.5px solid var(--mk-line);
+}
+
+article blockquote {
+  margin: 14px 0;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--mk-accent);
+  color: var(--mk-muted);
+}
+
+article p.rubric {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+article img {
+  max-width: 100%;
+  height: auto;
+}
+
+article kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--mk-line);
+  background: var(--mk-flysch);
+  font: 0.85em var(--mk-mono);
+}
+
+/* ---- code --------------------------------------------------------------- */
+
+article code.literal,
+article .sig-inline {
+  padding: 1.5px 6px;
+  border: 1px solid var(--mk-line);
+  border-radius: 2px;
+  background: rgba(var(--mk-ink-rgb), 0.08);
+  color: inherit;
+  font: 0.9em var(--mk-mono);
+}
+
+article a code.literal {
+  color: inherit;
+}
+
+article pre {
+  font-family: var(--mk-mono);
+}
+
+article div[class*="highlight-"] {
+  margin: 16px 0;
+}
+
+article div[class*="highlight-"] > .highlight {
+  box-sizing: border-box;
+  width: 100%; /* the highlight-* wrapper is a flex row in furo */
+  border: 1px solid var(--mk-line);
+  border-radius: 2px;
+  background: var(--mk-code-bg);
+  color: var(--mk-code-fg);
+  box-shadow: 3px 3px 0 rgba(var(--mk-ink-rgb), 0.16);
+}
+
+article .highlight pre {
+  padding: 16px 18px;
+  color: var(--mk-code-fg);
+  font: 13.5px/1.55 var(--mk-mono);
+  tab-size: 4;
+}
+
+article .highlight pre span.linenos {
+  color: rgba(243, 236, 217, 0.45);
+  box-shadow: none;
+}
+
+article .literal-block-wrapper {
+  margin: 18px 0;
+  border: 1px solid var(--mk-line);
+  border-radius: 2px;
+  box-shadow: 3px 3px 0 rgba(var(--mk-ink-rgb), 0.16);
+}
+
+article .literal-block-wrapper div[class*="highlight-"] {
+  margin: 0;
+}
+
+article .literal-block-wrapper div[class*="highlight-"] > .highlight {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+article .code-block-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--mk-line);
+  border-radius: 0;
+  background: var(--mk-card);
+  color: var(--mk-muted);
+  font: 500 12px/1.5 var(--mk-mono);
+  text-align: left;
+}
+
+article .code-block-caption .caption-text {
+  overflow-wrap: anywhere;
+}
+
+article .code-block-caption > .headerlink {
+  margin-left: 0;
+}
+
+article .highlight button.copybtn {
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(243, 236, 217, 0.25);
+  border-radius: 0;
+  background: var(--mk-code-bg);
+  color: rgba(243, 236, 217, 0.65);
+}
+
+article .highlight button.copybtn:hover {
+  color: var(--mk-code-fg);
+  border-color: rgba(243, 236, 217, 0.6);
+}
+
+article .highlight button.copybtn.success {
+  color: #9fd8a8;
+}
+
+/* ---- tables ------------------------------------------------------------- */
+
+article .table-wrapper {
+  margin: 16px 0;
+  overflow-x: auto;
+}
+
+article table.docutils {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  border: 1px solid var(--mk-line);
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+article table.docutils th,
+article table.docutils td,
+article table.docutils th:first-child,
+article table.docutils td:first-child,
+article table.docutils th:last-child,
+article table.docutils td:last-child {
+  border: 1px solid var(--mk-line);
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+article table.docutils th {
+  background: rgba(var(--mk-ink-rgb), 0.04);
+  font-family: var(--mk-sans);
+  font-weight: 600;
+}
+
+article table.docutils th p,
+article table.docutils td p {
+  margin: 0;
+}
+
+article table.docutils td p + p {
+  margin-top: 6px;
+}
+
+article table.docutils code.literal {
+  font-size: 0.88em;
+}
+
+/* ---- admonitions and collapse ------------------------------------------ */
+
+article .admonition,
+article .topic {
+  margin: 16px 0;
+  padding: 0 14px 4px;
+  border: 1px solid var(--mk-line);
+  border-left-width: 3px;
+  border-radius: 0;
+  background: var(--mk-card);
+  box-shadow: none;
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+article .admonition p.admonition-title,
+article p.topic-title {
+  margin: 0 -14px 8px;
+  padding: 7px 14px 7px 36px;
+  font: 600 13.5px/1.4 var(--mk-sans);
+}
+
+article .admonition p.admonition-title::before,
+article p.topic-title::before {
+  left: 14px;
+  top: 8px;
+}
+
+article details {
+  margin: 16px 0;
+  border: 1px solid var(--mk-line);
+  background: var(--mk-card);
+}
+
+article details > summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  font: 600 14px/1.5 var(--mk-sans);
+  list-style: none;
+}
+
+article details > summary::-webkit-details-marker {
+  display: none;
+}
+
+article details > summary::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 10px 2px 0;
+  background: var(--mk-ink);
+  vertical-align: middle;
+  opacity: 0.6;
+}
+
+article details[open] > summary {
+  border-bottom: 1px solid var(--mk-line);
+}
+
+article details[open] > summary::before {
+  background: var(--mk-link);
+  opacity: 1;
+}
+
+article details > :not(summary) {
+  margin-left: 12px;
+  margin-right: 12px;
+}
+
+article details > :nth-child(2) {
+  margin-top: 12px;
+}
+
+article details > :last-child {
+  margin-bottom: 12px;
+}
+
+article details div[class*="highlight-"] > .highlight,
+article details .literal-block-wrapper {
+  box-shadow: none;
+}
+
+/* sphinx-inline-tabs, if a page ever uses them */
+article .tab-set {
+  margin: 16px 0;
+}
+
+article .tab-label {
+  border-radius: 0;
+  font: 500 13.5px var(--mk-sans);
+}
+
+/* ---- prev / next and footer --------------------------------------------- */
+
+.related-pages {
+  margin-top: 36px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mk-line);
+  font-size: 13.5px;
+}
+
+.related-pages a {
+  color: var(--mk-ink);
+}
+
+.related-pages .page-info .context {
+  color: var(--mk-faint);
+  font: 500 10.5px var(--mk-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.related-pages .page-info .title {
+  color: var(--mk-link);
+}
+
+.related-pages a:hover .page-info .title {
+  color: var(--mk-biscay);
+  text-decoration-color: currentColor;
+}
+
+.related-pages a svg.furo-related-icon,
+.related-pages a svg.furo-related-icon > use {
+  color: var(--mk-faint);
+}
+
+.mk-footer,
+.bottom-of-page {
+  display: block;
+  margin-top: 28px;
+  padding: 18px 0 0;
+  border-top: 1.5px solid var(--mk-line);
+  color: var(--mk-ink);
+  font: 12px/1.6 var(--mk-sans);
+  opacity: 0.65;
+  text-align: left;
+}
+
+.mk-footer p {
+  margin: 0;
+}
+
+.mk-footer a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--mk-ink-rgb), 0.35);
+  text-underline-offset: 2px;
+}
+
+.mk-footer a:hover {
+  color: var(--mk-link);
+  text-decoration-color: currentColor;
+}
+
+.back-to-top {
+  border: 1.5px solid var(--mk-line);
+  border-radius: 0;
+  background: var(--mk-card);
+  color: var(--mk-ink);
+  box-shadow: none;
+  font: 12.5px var(--mk-sans);
+  top: calc(var(--mk-header-h) + 10px);
+}
+
+/* ---- search page -------------------------------------------------------- */
+
+#search-results .search {
+  padding-left: 0;
+  list-style: none;
+}
+
+#search-results .search li {
+  margin: 0 0 14px;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--mk-line);
+}
+
+#search-results .context {
+  color: var(--mk-muted);
+  font-size: 14px;
+}
+
+#search-results .highlighted,
+article .highlighted {
+  background: var(--mk-down);
+  color: var(--mk-ink);
+  border-radius: 0;
+}
+
+/* ==========================================================================
+   Content components used by the markdown (grep-confirmed). Everything under
+   .diagram is owned by diagrams.css and intentionally absent here.
+   ========================================================================== */
+
+/* page eyebrow: "mark-kit · 0.1.0.dev0" */
+.version {
+  margin: 0 0 12px;
+  color: var(--mk-faint);
+  font: 500 12px var(--mk-mono);
+  letter-spacing: 0.04em;
+}
+
+.version p {
+  margin: 0;
+}
+
+/* maturity label at the top of feature pages */
+.current-label {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 10px;
+  padding: 3px 8px;
+  border: 1px solid rgba(30, 111, 168, 0.35);
+  background: rgba(30, 111, 168, 0.09);
+  color: var(--mk-link);
+  font: 600 10.5px/1.4 var(--mk-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* secondary line under a title, card, or evidence note */
+.small {
+  color: var(--mk-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* external paper / standard reference chip */
+a.paper {
+  display: inline-block;
+  margin: 2px 6px 2px 0;
+  padding: 4px 8px;
+  border: 1px solid var(--mk-line);
+  background: var(--mk-bg);
+  color: var(--mk-link);
+  font: 500 12px/1.4 var(--mk-mono);
+  text-decoration: none;
+}
+
+a.paper::after {
+  content: " \2197";
+  font-size: 0.85em;
+}
+
+a.paper:hover {
+  border-color: var(--mk-link);
+  color: var(--mk-biscay);
+}
+
+/* "Evidence" / "Research basis" block under a section */
+.source-block {
+  margin: 22px 0;
+  padding: 12px 16px 14px;
+  border: 1px solid var(--mk-line);
+  border-left: 3px solid var(--mk-accent);
+  background: var(--mk-card);
+}
+
+.source-block > p {
+  margin: 6px 0 0;
+}
+
+.source-block > p:first-child {
+  margin-top: 0;
+}
+
+.source-block > p:first-child > strong:only-child {
+  display: block;
+  color: var(--mk-ink);
+  font: 600 11px/1.6 var(--mk-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.source-block a.paper {
+  margin: 4px 6px 0 0;
+}
+
+.source-block .small {
+  display: block;
+  margin-top: 8px;
+}
+
+/* card grids */
+.cards,
+.connector-examples,
+.split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.cards .card,
+.connector-examples .card,
+.split .card {
+  min-width: 0;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--mk-edge);
+  background: var(--mk-bg);
+}
+
+.card > p {
+  margin: 0;
+}
+
+.card > p + p {
+  margin-top: 6px;
+}
+
+.card > p:first-child > code.literal:only-child {
+  font-weight: 600;
+}
+
+.cards .card p,
+.connector-examples .card p,
+.split .card p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.card > p.rubric {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.connector-examples .card > p.rubric + p {
+  color: var(--mk-muted);
+  font-size: 13px;
+}
+
+.connector-examples .card div[class*="highlight-"] {
+  margin: 10px 0 0;
+}
+
+.connector-examples .card div[class*="highlight-"] > .highlight {
+  box-shadow: none;
+}
+
+.connector-examples .card .highlight pre {
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* freshness status order: four cells with a state-coloured top rule */
+.status-order {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 18px 0;
+  border: 1px solid var(--mk-edge);
+}
+
+.status-order > div {
+  padding: 10px 12px;
+  border-right: 1px solid var(--mk-line);
+  border-top: 3px solid var(--mk-line);
+  background: var(--mk-bg);
+}
+
+.status-order > div:last-child {
+  border-right: 0;
+}
+
+.status-order b,
+.status-order small {
+  display: block;
+}
+
+.status-order b {
+  font: 600 12px/1.4 var(--mk-mono);
+}
+
+.status-order small {
+  margin-top: 4px;
+  color: var(--mk-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.status-order .missing {
+  border-top-color: var(--mk-espelette);
+}
+
+.status-order .unversioned {
+  border-top-color: var(--mk-clay);
+}
+
+.status-order .stale {
+  border-top-color: var(--mk-accent);
+}
+
+.status-order .current {
+  border-top-color: var(--mk-moss);
+}
+
+/* objective / metric grid: name on top, direction or threshold below in mono */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 18px 0;
+  border: 1px solid var(--mk-edge);
+  background: var(--mk-line);
+}
+
+.metric-grid > div {
+  padding: 12px 14px;
+  background: var(--mk-bg);
+}
+
+.metric-grid > div > p {
+  margin: 0;
+  color: var(--mk-muted);
+  font: 500 11px/1.5 var(--mk-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.metric-grid strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--mk-ink);
+  font: 600 14px/1.35 var(--mk-sans);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ---- responsive --------------------------------------------------------- */
+
+@media (max-width: 82em) {
+  .toc-drawer {
+    top: 0;
+    height: 100vh;
+    border-left: 1.5px solid var(--mk-line);
+  }
+  .toc-sticky {
+    top: 0;
+    height: 100vh;
+  }
+}
+
+@media (max-width: 67em) {
+  .content {
+    margin: 0;
+    padding: 28px 28px;
+  }
+}
+
+@media (max-width: 63em) {
+  .mk-header {
+    padding: 12px 18px;
+    gap: 12px;
+  }
+  .mk-menu {
+    display: inline-flex;
+  }
+  .mk-nav {
+    gap: 12px;
+  }
+  .mk-header .mk-toc:not(.no-toc) {
+    display: inline-flex;
+  }
+  .sidebar-drawer,
+  #__navigation:checked ~ .page .sidebar-drawer {
+    top: var(--mk-header-h);
+    left: calc(-1 * var(--mk-sidebar-w));
+    width: var(--mk-sidebar-w);
+    height: calc(100vh - var(--mk-header-h));
+  }
+  #__navigation:checked ~ .page .sidebar-drawer {
+    left: 0;
+  }
+  .sidebar-sticky {
+    top: 0;
+    height: 100%;
+  }
+}
+
+@media (max-width: 48em) {
+  .content {
+    padding: 24px 18px;
+  }
+  .mk-nav a[title="Apache 2.0"] {
+    display: none;
+  }
+  article h1 {
+    font-size: 28px;
+  }
+  .cards,
+  .connector-examples,
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .status-order {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .status-order > div:nth-child(2) {
+    border-right: 0;
+  }
+  .status-order > div:nth-child(n + 3) {
+    border-top-width: 3px;
+  }
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media print {
+  .mk-header,
+  .mk-footer {
+    display: none;
+  }
+}

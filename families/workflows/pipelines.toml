@@ -1,0 +1,41 @@
+schema_version = 1
+
+[family]
+name = "workflows"
+version = "1.0.0"
+description = "Composable record processing and evidence ranking workflows."
+
+[publisher]
+name = "pipelines"
+
+[source]
+root = "../../adaptations/workflows/src"
+package = "module_workflows"
+modules = ["module_workflows.iterables"]
+license_files = ["../../LICENSE"]
+
+[context]
+solves = ["Construct processing programs from independently supplied algorithm modules"]
+
+[[members]]
+id = "deduplicated_batches"
+kind = "functor"
+symbol = "module_workflows.iterables:deduplicated_batches"
+summary = "Compose first-occurrence deduplication followed by bounded record batches."
+version = "1.0.0"
+provides = { id = "workflows.batch_pipeline", version = "1" }
+requires = { chunker = {id = "iterators.chunker", version = "1"}, deduplicator = {id = "iterators.unique", version = "1"} }
+capabilities = ["deduplicate", "batch"]
+effects = ["dependency-effects"]
+assumes = ["Finite input of hashable records", "The selected providers satisfy the shared iterator laws"]
+
+[[members]]
+id = "batches"
+kind = "functor"
+symbol = "module_workflows.iterables:batches"
+summary = "Compose bounded record batches from a selected chunking implementation."
+version = "1.0.0"
+provides = { id = "workflows.batch_pipeline", version = "1" }
+requires = { chunker = {id = "iterators.chunker", version = "1"} }
+capabilities = ["batch"]
+effects = ["dependency-effects"]

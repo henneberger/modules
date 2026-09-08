@@ -1,0 +1,88 @@
+{
+  "date": "2026-09-08",
+  "version": "0.2.0",
+  "repository_schema": 3,
+  "authoring": "TOML only, publisher required, no legacy compatibility paths",
+  "tests": {
+    "command": ".venv/bin/pytest -q --tb=short",
+    "passed": 259,
+    "subtests_passed": 32,
+    "seconds": 9.41,
+    "includes": [
+      "authenticated HTTP repository over real localhost TCP",
+      "independent publishers and incremental family contributions",
+      "interfaces, grouped exports, type sharing, compiler and build cache",
+      "capability synthesis, ambiguity, bounds, tamper rejection",
+      "offline wheel dependency locking, synchronization and execution",
+      "real more-itertools, Boltons and Mari synthesis example"
+    ]
+  },
+  "mari": {
+    "adaptations": [
+      "Original import paths are synthetic namespaces delegating to verified wheel cells.",
+      "The polar_scores monkeypatch forwards to search_index's compiled global binding."
+    ],
+    "artifacts": 2322,
+    "excluded_files": [
+      "tests/test_architecture.py"
+    ],
+    "experiment": "copied Mari semantic suite against extracted wheel cells",
+    "members": 988,
+    "original_package_modules_executed": [],
+    "pytest_exit_code": 0,
+    "python": "3.13.3",
+    "results": {
+      "passed": 429
+    },
+    "schema_version": 1,
+    "seconds": 6.332,
+    "source_digest": "6eabd74fa608dd0a5f4986efc4b6e23704d146260f7ca69e9f090a3210e837eb"
+  },
+  "real_world": {
+    "report": "real-world-validation.json",
+    "work_dir": ".mf/release",
+    "initial_programs": 1,
+    "programs_after_boltons_publication": 4,
+    "old_lock_replayed": true,
+    "mari_freshness": 0.5,
+    "offline_environment_wheels": 10,
+    "offline_replay": [
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        4
+      ]
+    ],
+    "original_packages_imported": [],
+    "environment_lock": ".mf/release/final-environment/environment.lock.json"
+  },
+  "build_scale": {
+    "report": "build-scale-validation.json",
+    "definitions": 10000,
+    "contributor_fragments": 1000,
+    "root_toml_lines": 21,
+    "selected_artifacts": 3
+  },
+  "mixins": {
+    "implemented": false,
+    "handoff": "mixins-handoff.md"
+  },
+  "limits": [
+    "Bounded synthesis of published components; capabilities and behavioral laws are assertions, not proofs.",
+    "Single-node repository; internet-scale throughput and federation not validated.",
+    "Atomic binding visibility does not roll back arbitrary Python effects.",
+    "Existing source adaptation is explicit and reviewed; arbitrary Python source is not supported.",
+    "Installed environment contents are trusted after synchronization; execution is not an OS sandbox."
+  ],
+  "original_mari_working_tree": "git status --porcelain empty; no original files edited",
+  "release_wheel": {
+    "path": "dist/module-families/module_families-0.2.0-py3-none-any.whl",
+    "sha256": "80ee9ef0b2546df4e6ccc1426e3388ff5f1d6f0ec0b1a7c3313db1d745d9ffca",
+    "built": true
+  },
+  "lint": "passed",
+  "readme_local_links": "all resolve"
+}

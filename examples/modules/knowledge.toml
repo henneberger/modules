@@ -1,0 +1,57 @@
+schema_version = 1
+
+[family]
+name = "knowledge"
+version = "1.0.0"
+description = "Composable knowledge retrieval and execution modules"
+
+[publisher]
+name = "integrator"
+
+[module]
+id = "system"
+version = "1.0.0"
+provides = { id = "knowledge.system", version = "1" }
+summary = "A compiled Mari, scikit-learn, SQLite, and Python executor composition"
+capabilities = ["batch-retrieval", "diversified-retrieval", "cached-embeddings"]
+
+[nodes.base.select]
+family = "knowledge"
+member = "adapters.hashing"
+
+[nodes.embedding.select]
+family = "knowledge"
+member = "adapters.cached_embedding"
+
+[nodes.data.select]
+family = "knowledge"
+member = "adapters.sqlite_documents"
+
+[nodes.retrieval.select]
+family = "knowledge"
+member = "integrator.retrieval"
+
+[nodes.harness.select]
+family = "knowledge"
+member = "adapters.threaded_queries"
+
+[links]
+"embedding.base" = "base"
+"retrieval.embedding" = "embedding"
+"retrieval.data" = "data"
+"harness.retrieval" = "retrieval"
+"harness.data" = "data"
+
+[constraints]
+same_instance = [["retrieval.data", "harness.data"]]
+same_index = [["embedding.Space", "retrieval.Space"]]
+
+[exports]
+run = "harness.run"
+close = "data.close"
+
+[indices]
+Space = "embedding.Space"
+
+[policy]
+allowed_effects = ["caller-iteration", "memory", "threads"]

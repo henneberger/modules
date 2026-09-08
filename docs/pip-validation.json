@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "experiment": "standard pip offline selected member installation from compact TOML build",
+  "python": "3.13.3",
+  "manifest": "families/mari/family.toml",
+  "member": "algorithms.temporal.recency_decay",
+  "distribution": "mf-mari-algorithms-temporal-recency-decay",
+  "version": "0.1.0",
+  "artifact_sha256": "b0afb0f6b6a108a6b84ec2f46c4a27f13cfdf02d53e69e0e7d508dd937fb6665",
+  "installed_distributions": [
+    "mf_cell_0aa703e8351eff9fa9ff25c90bf19b5701e9cc15b43e6d31efdb6e541f9528cf-0.1.0.dist-info",
+    "mf_mari_algorithms_temporal_recency_decay-0.1.0.dist-info"
+  ],
+  "pip_exit_code": 0,
+  "execution_exit_code": 0,
+  "original_source_imported": false,
+  "assertion": "recency_decay(10, method=\"exponential\", half_life=10) == 0.5"
+}

@@ -1,0 +1,26 @@
+{
+  "python": "3.14.6",
+  "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+  "workload": "synthetic independent operations sharing one helper",
+  "discovered_members": 10000,
+  "contributor_files": 1000,
+  "family_toml_lines": 21,
+  "family_toml_bytes": 279,
+  "selected_member": "benchmark.batch0000.operation00000",
+  "built_members": 1,
+  "built_artifacts": 3,
+  "compiled_cells": 10001,
+  "selected_cells": 2,
+  "cached_wheels_unchanged": true,
+  "timings": {
+    "discovery_seconds": 0.3641652502119541,
+    "plan_seconds": 2.3949912497773767,
+    "selected_build_seconds": 2.5946082081645727,
+    "repeated_build_seconds": 0.5840278342366219
+  },
+  "limits": [
+    "Synthetic local workload; no network, concurrent writers, or agent task-success evaluation.",
+    "Cold analysis parses the selected package scope; unchanged inputs reuse the persistent analysis cache, which is not a fine-grained incremental parser.",
+    "Ten thousand trivial definitions do not establish support for arbitrary ecosystem packages."
+  ]
+}

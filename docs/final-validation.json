@@ -1,0 +1,53 @@
+{
+  "date": "2026-09-08",
+  "version": "0.3.0",
+  "repository_schema": 3,
+  "tests": {
+    "passed": 281,
+    "subtests_passed": 32,
+    "seconds": 13.73,
+    "new_module_graph_tests": 22,
+    "command": ".venv/bin/pytest -q --tb=short"
+  },
+  "ruff": "passed: src tests scripts examples adaptations/knowledge",
+  "module_build": {
+    "format": "module-families-port-graph-1",
+    "nonrecursive_mixins": true,
+    "partial_publication": true,
+    "generated_python": true,
+    "contract_stubs": true,
+    "semantic_indices": true,
+    "shared_instances": true,
+    "recursive_linking": false,
+    "arbitrary_topology_synthesis": false
+  },
+  "real_candidate": {
+    "report": "module-build-validation.json",
+    "work_dir": ".mf/knowledge-release",
+    "source_unchanged": true,
+    "mari_source_sha256": "9ac592e50a56eb0d495fec7ba4b8a9f71e34574034dee657c5d7b9f19d75bac9",
+    "first_hits": [
+      "dogs",
+      "python"
+    ],
+    "offline_environment": ".mf/knowledge-release/environment/environment.lock.json",
+    "program_sha256": "1a15a94b9c52dcfdea3afc4789a4c8e6df9cda828eba0937b02eda3d25637354"
+  },
+  "release_wheel": {
+    "path": "dist/module-families/module_families-0.3.0-py3-none-any.whl",
+    "sha256": "6d20c287810c1667dff0bd60b4c5d57df8f1dd9b1803aafe23616bf1e8dde2dc",
+    "built": true
+  },
+  "original_mari_working_tree": "git status --porcelain empty; original project not edited",
+  "previous_measurements": {
+    "report": "final-validation-0.2.json",
+    "note": "Historical 0.2.0 Mari semantic and 10000-definition measurements; not rerun for this graph-only extension"
+  },
+  "limits": [
+    "Nonrecursive graph linking through explicit Python dependency ports; arbitrary global rebinding is unsupported.",
+    "Graph selection uses authored topology; published open graphs participate in constructor synthesis.",
+    "Semantic indices, capabilities, and effects are declarations, not proofs of behavior.",
+    "Resource lifetime is explicit Python behavior; automatic cleanup and async initialization are not inferred.",
+    "Real harness is a Python executor, not an LLM agent; embeddings use lexical hashing."
+  ]
+}

@@ -1,0 +1,44 @@
+schema_version = 1
+
+[family]
+name = "knowledge"
+version = "1.0.0"
+description = "Composable knowledge retrieval and execution modules"
+
+[publisher]
+name = "integrator"
+
+[module]
+id = "retrieval"
+version = "1.0.0"
+provides = { id = "knowledge.retrieval", version = "1" }
+summary = "Mari MMR retrieval with open embedding and data ports"
+capabilities = ["diversified-retrieval"]
+
+[ports.embedding]
+requires = { id = "knowledge.embedding", version = "1" }
+
+[ports.data]
+requires = { id = "knowledge.documents", version = "1" }
+
+[nodes.ranker.select]
+family = "knowledge"
+member = "mari.mmr"
+
+[nodes.retrieval.select]
+family = "knowledge"
+member = "adapters.retrieval"
+
+[links]
+"retrieval.embedding" = "embedding"
+"retrieval.data" = "data"
+"retrieval.ranker" = "ranker"
+
+[exports]
+search = "retrieval.search"
+
+[indices]
+Space = "embedding.Space"
+
+[policy]
+allowed_effects = ["caller-iteration"]

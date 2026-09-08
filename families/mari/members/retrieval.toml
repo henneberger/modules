@@ -1,0 +1,29 @@
+[[members]]
+avoid_when = ["You need a globally optimal subset or formal independent corroboration."]
+effects = ["caller-callback"]
+id = "retrieval.fusion.maximal_marginal_relevance"
+kind = "algorithm"
+metadata_basis = ["curated-from-source-and-workload-guide"]
+solves = ["Choose relevant evidence while reducing redundant search results."]
+tags = ["mmr", "diversity", "context-selection"]
+use_when = ["You can supply relevance values and a pairwise similarity callback."]
+
+[[members]]
+avoid_when = ["Absolute score differences should influence the final ranking."]
+effects = ["caller-callback"]
+id = "retrieval.fusion.reciprocal_rank_fusion"
+kind = "algorithm"
+metadata_basis = ["curated-from-source-and-workload-guide"]
+solves = ["Combine lexical and dense ranked search results without calibrated score scales."]
+tags = ["rank-fusion", "rrf", "hybrid-search", "uncalibrated-scores"]
+use_when = ["You have ranked document IDs from several retrieval sources."]
+
+[[members]]
+avoid_when = ["An exhaustive comparison over a large corpus is too expensive."]
+effects = []
+id = "retrieval.maxsim.exact_maxsim"
+kind = "algorithm"
+metadata_basis = ["curated-from-source-and-workload-guide"]
+solves = ["Compute exact late-interaction similarity between supplied multi-vector representations."]
+tags = ["maxsim", "colbert", "multi-vector", "reranking"]
+use_when = ["Rerank a bounded candidate set after approximate candidate retrieval."]

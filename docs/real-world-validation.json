@@ -1,0 +1,185 @@
+{
+  "publications": [
+    {
+      "source": "iterators/interfaces",
+      "publisher": "interfaces",
+      "family": "iterators",
+      "version": "0.1.0",
+      "members": 0,
+      "added_members": 0,
+      "artifacts": 0,
+      "interfaces": 2,
+      "added_interfaces": 2,
+      "sha256": "0be0319a9909f360a775f6fd75ed6f2dfa750d2df8f1fac7fede98dfa8c96ae8",
+      "already_published": false
+    },
+    {
+      "source": "iterators/more-itertools",
+      "publisher": "more-itertools",
+      "family": "iterators",
+      "version": "0.1.0",
+      "members": 2,
+      "added_members": 2,
+      "artifacts": 5,
+      "interfaces": 0,
+      "added_interfaces": 0,
+      "sha256": "5863456d8f1576ddde83d7d518fbd08866d3759c9bae87d5162bbdafa3d5e55c",
+      "already_published": false
+    },
+    {
+      "source": "workflows/interfaces",
+      "publisher": "interfaces",
+      "family": "workflows",
+      "version": "1.0.0",
+      "members": 0,
+      "added_members": 0,
+      "artifacts": 0,
+      "interfaces": 1,
+      "added_interfaces": 1,
+      "sha256": "aa0ccb8657f2c6f3e37f536cba80514929f91d9b188db40f9f3598c5c910a42c",
+      "already_published": false
+    },
+    {
+      "source": "workflows/pipelines",
+      "publisher": "pipelines",
+      "family": "workflows",
+      "version": "1.0.0",
+      "members": 2,
+      "added_members": 2,
+      "artifacts": 4,
+      "interfaces": 0,
+      "added_interfaces": 0,
+      "sha256": "2b299623dd03d71d12a368261a726771d65f0bfc3b3b8e71e0b1f3a8d80de47c",
+      "already_published": false
+    },
+    {
+      "source": "iterators/boltons",
+      "publisher": "boltons",
+      "family": "iterators",
+      "version": "0.1.0",
+      "members": 2,
+      "added_members": 2,
+      "artifacts": 6,
+      "interfaces": 0,
+      "added_interfaces": 0,
+      "sha256": "ec31fb79db5f06afbcb38fb75e7066daa9c6e78b88d5902654779fee338758a3",
+      "already_published": false
+    },
+    {
+      "source": "mari/family",
+      "publisher": "mari",
+      "family": "mari",
+      "version": "0.1.0",
+      "members": 1,
+      "added_members": 1,
+      "artifacts": 2,
+      "interfaces": 1,
+      "added_interfaces": 1,
+      "sha256": "2eb1932ff6552246f27693ea4fbf5b3e4b62b049ffd142218234faeab03aed72",
+      "already_published": false
+    }
+  ],
+  "solutions_before_new_publisher": 1,
+  "solutions_after_new_publisher": 4,
+  "programs": [
+    {
+      "choice": 0,
+      "sha256": "f92518b05766405074c6d5d56f04ff7ddbf272332e9982b88c2fdef40798d25a",
+      "members": [
+        "boltons.chunked",
+        "boltons.unique",
+        "pipelines.deduplicated_batches"
+      ],
+      "result": [
+        [
+          3,
+          1
+        ],
+        [
+          2,
+          4
+        ]
+      ]
+    },
+    {
+      "choice": 1,
+      "sha256": "07c63a7a0aad07e5a4ba1ce378d03d6991e09b6da9e2f23d2fe28ffdb4902c79",
+      "members": [
+        "boltons.chunked",
+        "more-itertools.unique",
+        "pipelines.deduplicated_batches"
+      ],
+      "result": [
+        [
+          3,
+          1
+        ],
+        [
+          2,
+          4
+        ]
+      ]
+    },
+    {
+      "choice": 2,
+      "sha256": "ba48b8af19c7df97e9e90dca64b536516b6a33a25ccabcabd48cd271b0b8d170",
+      "members": [
+        "boltons.unique",
+        "more-itertools.chunked",
+        "pipelines.deduplicated_batches"
+      ],
+      "result": [
+        [
+          3,
+          1
+        ],
+        [
+          2,
+          4
+        ]
+      ]
+    },
+    {
+      "choice": 3,
+      "sha256": "f12ddef56fca52d575fbbee6756dfa27f4fd70793173d650ff4851f5409956af",
+      "members": [
+        "more-itertools.chunked",
+        "more-itertools.unique",
+        "pipelines.deduplicated_batches"
+      ],
+      "result": [
+        [
+          3,
+          1
+        ],
+        [
+          2,
+          4
+        ]
+      ]
+    }
+  ],
+  "old_program_replays": true,
+  "mari_freshness": 0.5,
+  "loaded_upstream_packages": [],
+  "offline_environment": {
+    "lock": "/Users/henneberger/modules/.mf/release/final-environment/environment.lock.json",
+    "sha256": "27e12f614c40b7bfc4177beadc5a5b5957764c0663c33b508d0b5ad8defd0b71",
+    "wheels": 10,
+    "environment_locked": true,
+    "replay": {
+      "assembly": "f92518b05766405074c6d5d56f04ff7ddbf272332e9982b88c2fdef40798d25a",
+      "export": "run",
+      "result": [
+        [
+          3,
+          1
+        ],
+        [
+          2,
+          4
+        ]
+      ]
+    }
+  }
+}

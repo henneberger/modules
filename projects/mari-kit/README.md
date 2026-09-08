@@ -1,0 +1,594 @@
+# Mari Kit
+
+[![CI](https://github.com/MariHQ/mari-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/MariHQ/mari-kit/actions/workflows/ci.yml)
+
+Backend-agnostic Python tools for knowledge systems.
+
+Mari Kit turns changing company sources into versioned, permission-aware,
+evidence-linked knowledge. The Python distribution is named `mark-kit`, and
+Python imports use `mark_kit`.
+
+The package rename is a breaking change: update dependency declarations and all
+imports to these names. No legacy import alias is provided. The repository and
+documentation URLs are unchanged.
+
+Use it with OpenAI Agents SDK, LangGraph, PydanticAI, or any other agent
+runtime. Mark Kit does not implement an agent loop, model client,
+database, scheduler, or authorization system.
+
+Mari also does not define a canonical knowledge graph, ontology, construction
+pipeline, query planner, or truth policy. Graph algorithms accept caller-owned
+IDs and callbacks and return inspectable values without writing storage. An
+application or LLM can compose those operations for its particular system.
+
+## What it provides
+
+- Connector and synchronization contracts for polling, streaming hints,
+  checkpoints, tombstones, ACL observations, and complete-snapshot reconciliation.
+- Structural object and revision references, typed evidence locators, provenance,
+  review states, supersession, freshness, retention, and selective invalidation.
+- Permission-aware lexical, dense, multi-vector, graph, fusion, reranking, and
+  context-selection algorithms with inspectable scores and traces.
+- Parsers and validators for documents, facts, decisions, answers, schemas,
+  graph candidates, memories, completed agent activity, and learned procedures.
+- Reference stores, indexes, serializers, benchmarks, and conformance checks
+  that production adapters can replace.
+
+The [documentation](https://kit.mari.guru/) begins with complete paths for
+company search, governed knowledge, and knowledge derived from completed agent
+work. The feature pages contain the full capability catalog and research basis.
+For the shared integration path, start with
+[dependency-aware updates](docs/dependency-updates.md) and
+[conversation knowledge](docs/conversation-knowledge.md). The
+[repository docs index](docs/README.md) separates current guides from historical
+design notes and reference audits.
+
+## Installation
+
+The project currently targets Python 3.11 through 3.13.
+
+```bash
+python -m pip install 'mark-kit @ git+https://github.com/MariHQ/mari-kit.git'
+```
+
+For development:
+
+```bash
+git clone git@github.com:MariHQ/mari-kit.git
+cd mari-kit
+python3.11 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e '.[dev,examples]'
+```
+
+NumPy is the only required third-party runtime dependency. The `examples`
+extra installs the official OpenAI and Slack Python SDKs. The `openai-agents`
+and `langchain` extras install those runtimes alongside Mark Kit; they
+do not replace their native agent APIs with Mari wrappers.
+
+## Core model
+
+A connector emits immutable `KnowledgeDocument` revisions. Provider identity
+is namespaced through `document_id`, so IDs from different systems cannot
+collide.
+
+```python
+from mark_kit import DocumentACL, KnowledgeDocument, Principal
+
+document = KnowledgeDocument(
+    source_id="github:acme/product",
+    external_id="file:docs/refunds.md",
+    title="Refund policy",
+    body="Enterprise purchases can be refunded within 30 days.",
+    revision="8f31c2a",
+    source_url="https://github.com/acme/product/blob/main/docs/refunds.md",
+    acl=DocumentACL(
+        visibility="restricted",
+        principals=(Principal(kind="team", identifier="support"),),
+    ),
+)
+
+assert document.document_id == "github:acme%2Fproduct/file:docs%2Frefunds.md"
+assert document.content_digest.startswith("sha256:")
+```
+
+`DocumentACL` records what the provider reported. Your application maps those
+principals to its users and decides authorization. Mari does not silently turn
+provider metadata into an access-control system.
+
+## Synchronization
+
+Connectors yield `PollPage` values. `plan_sync` converts each page into
+upserts, deletes, unchanged IDs, and the next durable state without performing
+storage writes.
+
+```python
+from mark_kit import SyncMode
+from mark_kit.sync import SyncState, plan_sync
+
+state = SyncState()
+
+for page in connector_pages:
+    plan = plan_sync(
+        state,
+        page,
+        source_id="github:acme/product",
+        mode=SyncMode.FULL,
+    )
+
+    # Persist these document changes and plan.state atomically.
+    persist(
+        upserts=plan.upserts,
+        deletes=plan.deletes,
+        state=plan.state,
+        expected_generation=plan.expected_generation,
+    )
+    state = plan.state
+```
+
+Important guarantees:
+
+- Sync state is bound to one source.
+- An incomplete full snapshot cannot resume as an incremental sync.
+- Deletion by absence occurs only after a complete full snapshot.
+- Explicit provider tombstones are accepted in either mode.
+- Every plan advances a generation for compare-and-swap persistence.
+- Connector metadata cannot bypass content fingerprinting.
+
+`stream_sync` performs the same planning lazily for an iterable of pages.
+
+## Retrieval with MUVERA
+
+Build an immutable index from one or more vectors per document. Search uses
+MUVERA and PolarQuant to select candidates, then exact normalized MaxSim to
+rank the final results.
+
+```python
+import numpy as np
+
+from mark_kit.retrieval import build_index, search_index
+
+index = build_index({
+    "docs/refunds": np.asarray([
+        [1.0, 0.0, 0.0],
+        [0.9, 0.1, 0.0],
+    ], dtype=np.float32),
+    "docs/deployments": np.asarray([
+        [0.0, 1.0, 0.0],
+    ], dtype=np.float32),
+})
+
+query = np.asarray([[0.95, 0.05, 0.0]], dtype=np.float32)
+hits = search_index(
+    index,
+    query,
+    limit=5,
+    allowed_document_ids={"docs/refunds"},
+)
+
+assert hits[0].document_id == "docs/refunds"
+```
+
+`allowed_document_ids` must come from the host's authorization decision. The
+filter is applied before candidate scoring and exact reranking, so restricted
+documents cannot appear in the result set.
+
+Indexes can be persisted with `serialize_index` and restored with
+`deserialize_index`. The serialized files include checksums and reject unknown,
+missing, or corrupted entries.
+
+For weighted reciprocal-rank fusion, diversity-aware packing, graph
+propagation, topic segmentation, and memory mutation plans, see
+[`docs/research-algorithms.md`](docs/research-algorithms.md).
+Ten additional paper-derived retrieval, memory, evidence-reading, and
+compression boundaries are documented in
+[`docs/ten-paper-extensions.md`](docs/ten-paper-extensions.md).
+Contradiction retrieval and within-document self-contradiction detection are
+documented separately in
+[`docs/contradiction-algorithms.md`](docs/contradiction-algorithms.md).
+Their permissively licensed cross-implementation checks and the RRC-DSCD
+paper/code discrepancy are recorded in
+[`docs/contradiction-reference-validation.md`](docs/contradiction-reference-validation.md).
+The original evidence and validation requirements behind the artifact, store,
+pipeline, context, temporal-graph, procedure, and compiler APIs are in
+the historical [API design rationale](docs/proposed-api-foundations.md).
+Use the current feature docs for importable signatures and implementation scope.
+
+## Evidence validation and freshness
+
+The [incremental maintenance algorithms](docs/incremental-maintenance.md) add
+selection-aware dependencies, an indexed update frontier, stable split/merge
+lineage, and reversible count/vector/lexical/membership aggregates. Run
+`python -m examples.quickstarts.knowledge_maintenance` for the complete
+message-to-topic-to-search fixture, including clean-rebuild equivalence checks.
+
+Atoms, retrieval units, evidence, and derived artifacts share scoped revision
+references and a common dependency-update planner. It tracks exact text,
+context, source bindings, collection membership, and caller-supplied policy
+versions. Successful materialization receipts allow unchanged outputs to stop
+downstream recomputation. See [shared dependency updates](docs/dependency-updates.md)
+and the [executable integration](examples/quickstarts/dependency_updates.py).
+
+Mark Kit does not own prompts or model calls. Give your agent the source
+documents, then pass its structured output to a parser. The parser verifies
+document IDs, exact quotes, character spans, and source revisions.
+
+```python
+from mark_kit.knowledge import assess_freshness, parse_answer
+
+model_output = {
+    "answer": "Enterprise purchases can be refunded within 30 days.",
+    "disposition": "grounded",
+    "evidence": [{
+        "document_id": document.document_id,
+        "quote": "Enterprise purchases can be refunded within 30 days.",
+    }],
+}
+
+answer = parse_answer(
+    "Can an enterprise purchase be refunded?",
+    (document,),
+    model_output,
+)
+
+current = assess_freshness(
+    answer.evidence,
+    {document.document_id: "8f31c2a"},
+)
+assert current.reusable
+
+stale = assess_freshness(
+    answer.evidence,
+    {document.document_id: "a91de77"},
+)
+assert not stale.reusable
+```
+
+Available parsers include `parse_facts`, `parse_claim_assessments`,
+`parse_decisions`, `parse_answer`, `parse_answer_candidates`, `parse_glossary`,
+`parse_digest`, `parse_impact`, and `parse_refinement`.
+
+See [`docs/knowledge-parsers.md`](docs/knowledge-parsers.md) for the academic
+task foundations behind each parser, the exact contract Mari adopts, and the
+places where deterministic validation is intentionally narrower than semantic
+entailment or the cited benchmark.
+
+Fact extraction and checking tolerate only recoverable model drift. Cosmetic
+claim variants are deduplicated with `normalize_claim`; reordered or lightly
+paraphrased assessment rows are restored to the caller's original claim order;
+missing rows and unverifiable citations become `uncertain` rather than
+invalidating sound findings elsewhere in the batch. Bare evidence quotes are
+accepted only when they resolve to exactly one supplied document. Structured
+fact fields such as atomic claims, subject/relation/object, scopes, validity,
+and conditions are preserved in `FactCandidate.qualifiers`.
+
+Applications can make repeated extraction incremental at section granularity:
+
+```python
+from mark_kit.knowledge import fact_scan_revisions, pending_fact_sections
+
+pending = pending_fact_sections(
+    documents,
+    stored_fact_scan_revisions,
+    query="retention",
+    limit=20,
+)
+successful = extract_and_persist_review_candidates(pending)
+# Commit these checkpoint updates with the candidates when storage permits.
+stored_fact_scan_revisions |= fact_scan_revisions(successful)
+```
+
+The section revision is a content hash, so unchanged passages remain complete
+while an edit creates one new unit of work. Selection is round-robin across
+documents. Persist checkpoints only after candidate persistence succeeds,
+preferably in the same transaction.
+
+## Verification portfolios
+
+Mari can repeatedly call any candidate-producing function and apply
+deterministic, evidence-aware selection. It does not configure or depend on a
+model runtime. The result contains the winner plus every score and failed
+attempt:
+
+```python
+from mark_kit.knowledge import parse_claim_assessments
+from mark_kit.verification import best_of_n, score_grounded
+
+
+def parse_prediction(prediction):
+    return parse_claim_assessments(
+        (claim,),
+        documents,
+        {"assessments": prediction.assessments},
+    )[0]
+
+
+result = best_of_n(
+    lambda: generate_assessment(claim, documents),
+    parse_prediction,
+    score_grounded,
+    attempts=3,
+    threshold=0.9,
+)
+assessment = result.selected
+score = result.selected_attempt.breakdown
+assert score is not None and score.evidence_valid
+```
+
+The same package exposes `select_best`, `verdict_consensus`,
+`idea_completeness`, and `harmonic_score`. Consensus abstains on ties or weak
+agreement and only carries evidence from assessments supporting the winning
+verdict. Scores are audit signals, not truth probabilities.
+
+Grounding coverage is a reproducible evidence signal, not a model confidence
+score and not an automatic approval decision. Review and publishing policy
+remain application concerns.
+
+Evidence parsed from Markdown is bound to a stable heading path and section
+content hash. Supply current section revisions to avoid invalidating artifacts
+for unrelated edits in the same document:
+
+```python
+from mark_kit.knowledge import section_revisions
+
+freshness = assess_freshness(
+    answer.evidence,
+    {current_document.document_id: current_document.revision},
+    current_section_revisions=section_revisions((current_document,)),
+)
+```
+
+If section revisions are omitted, Mari conservatively falls back to the whole
+document revision.
+
+## Managed tags
+
+Tags are deliberately separate from connector-owned documents. A new provider
+revision therefore cannot erase workspace curation.
+
+```python
+from mark_kit.knowledge import (
+    TagAssignments,
+    TagDefinition,
+    assign_tags,
+    search_weight,
+)
+
+definitions = {
+    "canonical": TagDefinition(
+        key="canonical",
+        label="Canonical",
+        kind="canonical",
+        search_weight=2.0,
+        behaviors=("Wins conflicts",),
+    ),
+}
+
+assignments = assign_tags(
+    TagAssignments(),
+    document.document_id,
+    definitions,
+    add=("canonical",),
+)
+
+assert assignments.tags_for(document.document_id) == frozenset({"canonical"})
+assert search_weight(document.document_id, assignments, definitions) == 2.0
+```
+
+Persist `TagDefinition` and `TagAssignments` in application-owned storage. This
+matches Mari Cloud's separate tag-definition and document-assignment model.
+
+## Reviewed intents, speculation, and response caching
+
+A `ReviewedWorkflow` is a human-reviewed intent with known read dependencies.
+It is not a general workflow engine. The default policy uses different gates
+for safe speculative reads and complete cached responses:
+
+- `speculation_threshold=0.70`
+- `cache_threshold=0.97`
+- `relevant_document_threshold=0.85`
+
+```python
+from mark_kit.trajectories import (
+    WorkflowAction,
+    WorkflowPolicy,
+    decide_reviewed_workflow,
+    start_speculative_retrieval,
+)
+
+decision = decide_reviewed_workflow(
+    query_vectors,
+    reviewed_workflow_index,
+    current_revisions,
+    current_section_revisions=current_section_revisions,
+    allowed_document_ids=authorized_document_ids,
+    relevant_document_scores=relevant_document_scores,
+    impact_decisions=user_reviewed_impact,
+    policy=WorkflowPolicy(),
+)
+
+if decision.action is WorkflowAction.CACHED_RESPONSE:
+    grounded_answer = decision.cached_answer
+    response = grounded_answer.answer
+
+elif decision.action is WorkflowAction.SPECULATIVE_RETRIEVAL:
+    retrieval_task = start_speculative_retrieval(
+        decision,
+        retrieve_documents_async,
+    )
+    # Continue through the host agent runtime and await/cancel the task there.
+```
+
+A complete response is reusable only when:
+
+1. The intent clears the high cache threshold.
+2. Every recorded document revision is current.
+3. No highly relevant new document has unresolved or positive impact.
+4. Every dependency document is authorized for the current user.
+
+When a new highly relevant document appears, a user can mark it non-impacting
+and preserve reuse. Otherwise Mari selects speculative retrieval and the host
+LLM path. Cached responses are `GroundedAnswer` artifacts, retaining exact
+evidence, citations, grounding coverage, and non-factual context dependencies
+such as a managed styleguide revision.
+
+Impact analysis is not limited to workflows. Give `impacted_artifacts` a
+namespaced mapping of answers, facts, digests, or workflows to their exact
+dependencies:
+
+```python
+from mark_kit.knowledge import impacted_artifacts
+
+impacts = impacted_artifacts(
+    {
+        "answer:refund-policy": answer.knowledge_dependencies,
+        "workflow:support-refund": answer.knowledge_dependencies,
+    },
+    current_revisions,
+    current_section_revisions=current_section_revisions,
+)
+```
+
+The returned freshness reports identify changed or missing document sections.
+
+## Trajectory analysis
+
+Normalize events emitted by the host agent framework, ask the host model to
+label the completed trajectory, and validate that the returned phase ranges
+cover the observed events exactly.
+
+```python
+from mark_kit.trajectories import parse_trajectory_analysis
+
+analysis = parse_trajectory_analysis(
+    normalized_events,
+    model_labels,
+    family_map={"search_product_knowledge": "inspect", "answer": "answer"},
+)
+```
+
+The library validates labels and redacts common sensitive arguments. It does
+not hide a trajectory prompt or execute an agent.
+
+## Conversations as searchable knowledge
+
+`mark_kit.conversation_knowledge` groups conversations and observable
+trajectory content into revision-bound episodes, validates cited knowledge,
+and emits summary, question, and topic retrieval facets. Settling windows,
+revision caching, and explicit call budgets bound extraction work. Returning
+evidence requires current, authorized source events.
+
+See the [integration guide and research references](docs/conversation-knowledge.md)
+and [credential-free runnable example](examples/conversation_knowledge_demo.py).
+This is a library pipeline: model callbacks, persistence, embeddings, and live
+connector integration remain application responsibilities. Semantic extraction
+quality has not yet been benchmarked.
+
+## Evidence context
+
+Expand retrieved document sections while preserving source spans, inspect citation
+declarations across tools, and plan conversation evidence retention. Optional
+Docling JSON mapping and revision-bound asset selection require no additional
+runtime dependencies. See [the guide](docs/evidence-context.md) and
+[the runnable example](examples/evidence_context_demo.py).
+
+## Connectors
+
+Connector functions accept an injected `HttpTransport`. This keeps network
+policy, retries, observability, and testing under application control.
+
+Each catalog provider exposes a configuration value plus validation and batch
+polling functions. Providers with event APIs additionally expose verified,
+checkpoint-free `ChangeHint` parsing. Events trigger a canonical provider
+refetch; they are never treated as complete documents. `stream_pages` can
+hydrate hints into `PollPage` values for the same synchronization planner.
+
+See [`docs/connectors.md`](docs/connectors.md) for both contracts, capability
+discovery, verification, hydration, and code examples. Executable integrations
+are under [`examples/`](examples/).
+
+Credentials are excluded from configuration representations. `HttpRequest`
+representations redact authorization headers, bodies, URL userinfo, and common
+sensitive query parameters. Applications must still keep raw provider payloads
+and tool results out of untrusted logs.
+
+## Executable examples
+
+The integration examples below support deterministic fixture mode and form a
+machine-readable acceptance suite. The two additional starting points are
+[dependency updates](examples/quickstarts/dependency_updates.py) and
+[conversation knowledge](examples/conversation_knowledge_demo.py):
+
+- [`github_pipeline`](examples/github_pipeline/) polls repository knowledge,
+  processes a webhook hint, repairs a missed event, reconciles deletion, and
+  returns evidence-linked output.
+- [`slack_event_pipeline`](examples/slack_event_pipeline/) refetches canonical
+  thread state, repairs a missed event, and preserves restricted-channel ACLs.
+- [`google_drive_change_stream`](examples/google_drive_change_stream/) applies
+  edits and deletions while avoiding re-embedding an ACL-only change.
+- [`knowledge_lifecycle`](examples/knowledge_lifecycle/) keeps model prompts in
+  the application and validates facts, decisions, glossary terms, FAQs, and a
+  digest against exact evidence.
+- [`slackbot_reliable_answers`](examples/slackbot_reliable_answers/) uses a
+  managed styleguide, real speculative retrieval, one DeepSeek answer round,
+  one post-answer analysis round, OpenAI embeddings, conservative caching, and
+  revision/new-document impact policies.
+- [`cross_user_acl_isolation`](examples/cross_user_acl_isolation/) proves that
+  restricted documents are excluded before both MUVERA scoring and reviewed
+  cache matching for an unauthorized user.
+- [`incident_response_drift`](examples/incident_response_drift/) changes one
+  section of a GitHub incident runbook, reports every affected answer, digest,
+  and workflow, and preserves the cached escalation guidance grounded in an
+  unchanged section.
+- [`workflow_view_step_cache`](examples/workflow_view_step_cache/) follows
+  [WorkflowView](https://arxiv.org/abs/2606.14654) to turn atomic actions into
+  detailed phases and a high-level activity, then independently caches the
+  evidence-grounded answers discovered inside those phases. It demonstrates
+  cross-workflow substep reuse, a tunable cache gate, and selective
+  invalidation when one dependency changes.
+
+Run everything without credentials:
+
+```bash
+python -m examples.verify_all
+python -m examples.conversation_knowledge_demo
+pytest -q
+```
+
+The Slackbot example can also read real GitHub documents. It posts to Slack
+only when `MARI_SLACK_POST=true` is explicitly set. See its
+[`README`](examples/slackbot_reliable_answers/README.md) and
+[`.env.example`](examples/slackbot_reliable_answers/.env.example).
+
+## Development and release checks
+
+```bash
+ruff format --check src tests examples
+ruff check src tests examples
+pyright src
+pytest -q
+python -m examples.verify_all
+python -m build
+```
+
+CI runs those checks on Python 3.11, 3.12, and 3.13 and installs the built wheel
+in a clean environment.
+
+## Project status
+
+The API is a pre-release preview. Breaking changes are allowed until the first
+stable release and the package is merged back into Mari Cloud. The immediate
+integration priorities are transactional sync-state persistence, real
+principal-to-document authorization tests, tag-assignment persistence, and
+scrubbed fixtures from live connector canaries.
+
+Licensed under the [Apache License 2.0](LICENSE.md).
+
+## Independently selectable algorithms
+
+The [algorithm choices catalog](docs/algorithm-choices.md) covers 21 additional
+families, with pinned source-project citations and explicit adaptation notes.
+Choose lexical variants, subset objectives/optimizers, graph solvers, retrieval
+policies, compression, linkage, or memory evolution independently. Models and
+storage remain caller choices. Run `python -m examples.algorithm_choices_demo`
+from a checkout; optional native solvers use `mark-kit[algorithm-solvers]`.

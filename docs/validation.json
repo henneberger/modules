@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "core_tests": 155,
+  "subtests": 5,
+  "ruff": "passed",
+  "format_check": "passed",
+  "runtime_wheel_build": "passed",
+  "installed_runtime_toml_plan": "passed",
+  "candidate_source_imported_during_installed_plan": false,
+  "mari_semantic_tests": 429,
+  "mari_public_definitions": 988,
+  "mari_artifacts": 2322,
+  "root_manifest": "families/mari/family.toml",
+  "source_project_modified": false
+}

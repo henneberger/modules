@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "manifest": "families/mari/family.toml",
+  "authored_root_lines": 40,
+  "authored_root_bytes": 1378,
+  "contribution_files": 2,
+  "explicit_annotations": 7,
+  "public_definitions": 988,
+  "artifacts": 2322,
+  "shared_cells": 1334,
+  "compiled_cells": 1337,
+  "wheel_bytes": 19656916,
+  "source_digest": "6eabd74fa608dd0a5f4986efc4b6e23704d146260f7ca69e9f090a3210e837eb",
+  "source_project_modified": false,
+  "build_index": "dist/mari/index.json"
+}
