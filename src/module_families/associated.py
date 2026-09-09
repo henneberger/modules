@@ -8,7 +8,7 @@ from __future__ import annotations
 import keyword
 from copy import deepcopy
 
-from .type_terms import normalize_constructors, normalize_term, substitute
+from .type_terms import fresh_scope, normalize_constructors, normalize_term, substitute
 
 
 def _name(value):
@@ -32,9 +32,16 @@ def validate_associated(card):
     if not isinstance(ports, dict):
         raise ValueError("requires must map dependency slots to interfaces")
 
+    binder_kinds = {}
+
     def term(value):
         normalized = normalize_term(value, constructors)
         for item in _walk(normalized):
+            if "fresh" in item:
+                binder = tuple(item["fresh"])
+                if binder in binder_kinds and binder_kinds[binder] != item["kind"]:
+                    raise ValueError("fresh abstract binder has inconsistent kinds")
+                binder_kinds[binder] = item["kind"]
             if "var" in item:
                 raise ValueError("member associated witnesses cannot contain inference variables")
             if "from" in item:
@@ -93,7 +100,7 @@ def _inputs(card, children, constructors=None):
     return tables, registry
 
 
-def resolve_associated(card, children, *, constructors=None):
+def resolve_associated(card, children, *, constructors=None, scope=None):
     """Resolve closed output witnesses; reject unsatisfied dependency equations.
 
     Children map slots to associated metadata ``{types, constructors}``, or to
@@ -115,6 +122,10 @@ def resolve_associated(card, children, *, constructors=None):
 
     def resolved(value):
         result = substitute(value, bindings, registry)
+        if any("fresh" in item for item in _walk(result)):
+            if scope is None:
+                raise ValueError("generated abstract types require an instantiation scope")
+            result = fresh_scope(result, scope)
         if any("from" in item or "var" in item for item in _walk(result)):
             raise ValueError(f"missing associated type binding: {value!r}")
         return result
@@ -130,10 +141,10 @@ def resolve_associated(card, children, *, constructors=None):
     return {name: resolved(value) for name, value in spec.get("types", {}).items()}
 
 
-def resolve_metadata(card, children):
+def resolve_metadata(card, children, *, scope=None):
     """Return closed witnesses together with their consistent constructor registry."""
     _, constructors = _inputs(card, children)
-    return {"types": resolve_associated(card, children, constructors=constructors), "constructors": constructors}
+    return {"types": resolve_associated(card, children, constructors=constructors, scope=scope), "constructors": constructors}
 
 
 def validate_against_interface(card, interface):

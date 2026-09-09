@@ -61,19 +61,24 @@ def _normalize(term, constructors, *, check_constructors=True):
             raise TypeTermError(f"type term exceeds depth {MAX_DEPTH} or size {MAX_NODES}")
         if not isinstance(node, Mapping):
             raise TypeTermError("type term must be a mapping")
-        tags = [key for key in ("nominal", "var", "from", "apply") if key in node]
+        tags = [key for key in ("nominal", "var", "from", "apply", "opaque", "fresh") if key in node]
         if len(tags) != 1:
-            raise TypeTermError("type term requires exactly one of nominal, var, from, apply")
+            raise TypeTermError("type term requires exactly one of nominal, var, from, apply, opaque, fresh")
         tag = tags[0]
-        expected = {tag, "kind", "args"} if tag == "apply" else {tag, "kind"}
+        expected = {tag, "kind", "args"} if tag in {"apply", "opaque"} else {tag, "kind"}
         if set(node) != expected:
             raise TypeTermError(f"{tag} type term requires exactly {sorted(expected)}")
+        if tag == "fresh":
+            path = node[tag] if isinstance(node[tag], list) else [node[tag]]
+            if not path or len(path) > 128:
+                raise TypeTermError("fresh type binders require a bounded nonempty path")
+            return {"fresh": [_name(part, "fresh binder segment") for part in path], "kind": _kind(node["kind"], "fresh binder")}
         name = _name(node[tag], f"{tag} identity")
         kind = _kind(node["kind"], f"{tag} {name}")
         if tag == "from" and ("." not in name or any(not part for part in name.split("."))):
             raise TypeTermError("from must be a dotted slot.Name path")
         result = {tag: name, "kind": kind}
-        if tag == "apply":
+        if tag in {"apply", "opaque"}:
             if not isinstance(node["args"], list):
                 raise TypeTermError(f"constructor {name}: args must be a list")
             args = [visit(arg, depth + 1) for arg in node["args"]]
@@ -147,8 +152,8 @@ def substitute(term, bindings, constructors=None):
             if replacement["kind"] != node["kind"]:
                 raise TypeTermError(f"substitution {key}: kind mismatch {node['kind']} != {replacement['kind']}")
             return visit(replacement, active | {key}, depth + 1)
-        if "apply" in node:
-            return {"apply": node["apply"], "kind": node["kind"],
+        if "args" in node:
+            return {**node,
                     "args": [visit(arg, active, depth + 1) for arg in node["args"]]}
         return dict(node)
 
@@ -201,10 +206,29 @@ def unify(equations, constructors=None):
                 if name in collect_variables(right):
                     raise TypeTermError(f"occurs check failed for {name}")
                 bindings[name] = right
-            elif "apply" in left and "apply" in right and left["apply"] == right["apply"]:
+            elif any(tag in left and tag in right and left[tag] == right[tag] for tag in ("apply", "opaque")):
                 pending[0:0] = [(a, b, number) for a, b in zip(left["args"], right["args"], strict=True)]
             else:
                 raise TypeTermError(f"rigid type mismatch: {left!r} != {right!r}")
         except TypeTermError as exc:
             raise TypeTermError(f"equation {number}: {exc}") from exc
     return {name: substitute(value, bindings, registry) for name, value in sorted(bindings.items())}
+
+
+def fresh_scope(term, scope, *, close=True):
+    if not isinstance(scope, (list, tuple)) or any(not isinstance(part, str) or not part for part in scope):
+        raise TypeTermError("type scopes must be sequences of nonempty identity segments")
+    normalized = _normalize(term, {}, check_constructors=False)
+
+    def visit(node):
+        if "fresh" in node:
+            path = [*scope, *node["fresh"]]
+            if not close:
+                return {"fresh": path, "kind": node["kind"]}
+            encoded = json.dumps(path, separators=(",", ":"), ensure_ascii=True).encode()
+            return {"nominal": "generated:" + hashlib.sha256(encoded).hexdigest(), "kind": node["kind"]}
+        if "args" in node:
+            return {**node, "args": [visit(arg) for arg in node["args"]]}
+        return dict(node)
+
+    return visit(normalized)

@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from .type_terms import normalize_constructors, normalize_term, substitute, unify
+from .module_ir import constructor_identity
+from .type_terms import (
+    fresh_scope,
+    normalize_constructors,
+    normalize_term,
+    substitute,
+    unify,
+)
 
 
 def _merge(registries):
@@ -64,14 +71,14 @@ def graph_associated(doc, cards, order, interfaces):
             raise ValueError(f"missing associated type: {path}")
         return values[owner][name]
 
-    def elaborate(term, bindings):
+    def elaborate(term, bindings, scope=()):
         term = normalize_term(term, constructors)
         for piece in _terms(term):
             if "var" in piece:
                 raise ValueError("graph witnesses use from paths, not free type variables")
             if "from" in piece and piece["from"] not in bindings:
                 raise ValueError(f"unknown associated projection: {piece['from']}")
-        return substitute(term, bindings, constructors)
+        return substitute(fresh_scope(term, scope, close=False), bindings, constructors)
 
     for alias in order:
         card = cards[alias]
@@ -80,16 +87,17 @@ def graph_associated(doc, cards, order, interfaces):
         for slot in card.get("requires", {}):
             provider = doc["links"][alias + "." + slot]
             bindings.update({slot + "." + name: term for name, term in values[provider].items()})
-        values[alias] = {name: elaborate(term, bindings) for name, term in metadata.get("types", {}).items()}
+        scope = [alias, constructor_identity(card)]
+        values[alias] = {name: elaborate(term, bindings, scope) for name, term in metadata.get("types", {}).items()}
         exported(card["provides"], values[alias], alias)
         for slot, constraints in metadata.get("requires", {}).items():
             for name, expected in constraints.items():
                 path = slot + "." + name
                 if path not in bindings:
                     raise ValueError(f"missing associated requirement: {alias}.{path}")
-                equation(bindings[path], elaborate(expected, bindings), alias + "." + path)
+                equation(bindings[path], elaborate(expected, bindings, scope), alias + "." + path)
         for left, right in metadata.get("sharing", []):
-            equation(elaborate(left, bindings), elaborate(right, bindings), alias + " sharing")
+            equation(elaborate(left, bindings, scope), elaborate(right, bindings, scope), alias + " sharing")
     graph_bindings = {alias + "." + name: value for alias, types in values.items() for name, value in types.items()}
     result = {name: elaborate(term, graph_bindings) for name, term in own.get("types", {}).items()}
     exported(doc["module"]["provides"], result, "result")
@@ -144,7 +152,7 @@ def graph_associated(doc, cards, order, interfaces):
             if variable not in variable_kinds:
                 raise ValueError(f"escaping abstract type variable: {variable}")
             return {"from": variable.removeprefix("port:"), "kind": term["kind"]}
-        if "apply" in term:
+        if "args" in term:
             return {**term, "args": [external(arg) for arg in term["args"]]}
         return term
 

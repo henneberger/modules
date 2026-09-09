@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from copy import deepcopy
 from dataclasses import dataclass
 
@@ -211,9 +213,12 @@ def satisfy_instance_sharing(expression, cards):
     return result
 
 
-def compile_unit(*, ports, nodes, exports, signature, equations=None, bodies=None):
+def compile_unit(*, ports, nodes, exports, signature, equations=None, bodies=None, identities=None):
     ports, nodes, exports = deepcopy(ports), deepcopy(nodes), deepcopy(exports)
     bodies = deepcopy(bodies or {})
+    identities = dict(identities or {})
+    if any(not isinstance(name, str) or not isinstance(value, str) or not value for name, value in identities.items()):
+        raise ModuleIRError("module implementation identities must be nonempty strings")
     if set(ports) & set(nodes):
         raise ModuleIRError("module ports and bindings must have distinct names")
     dependencies = {}
@@ -255,6 +260,7 @@ def compile_unit(*, ports, nodes, exports, signature, equations=None, bodies=Non
         "signature": deepcopy(signature),
         "equations": deepcopy(equations or {}),
         "bodies": bodies,
+        "identities": identities,
         "order": list(dependency_order(dependencies)),
     }
 
@@ -267,6 +273,7 @@ def lower_graph(document, cards):
         }} for name, card in cards.items()},
         exports={name: {"ref": path.split(".")[0], "export": path.split(".")[1]} for name, path in document["exports"].items()},
         signature=document["module"]["provides"],
+        identities={alias: constructor_identity(card) for alias, card in cards.items()},
         equations={
             "associated": document.get("associated", {}),
             "constraints": document.get("constraints", {}),
@@ -275,10 +282,10 @@ def lower_graph(document, cards):
     )
 
 
-def execute_unit(unit, implementations, ports):
+def execute_unit(unit, implementations, ports, *, type_scope=None):
     checked = compile_unit(
         ports=unit["ports"], nodes=unit["nodes"], exports=unit["exports"],
-        signature=unit["signature"], equations=unit["equations"], bodies=unit["bodies"],
+        signature=unit["signature"], equations=unit["equations"], bodies=unit["bodies"], identities=unit["identities"],
     )
     if checked != unit:
         raise ModuleIRError("compiled module unit is not canonical")
@@ -287,13 +294,54 @@ def execute_unit(unit, implementations, ports):
     required = {node.get("use", node.get("body")) for node in unit["nodes"].values()}
     if not required <= implementations.keys():
         raise ModuleIRError("compiled module unit has missing implementations")
+    scope = list(type_scope) if type_scope is not None else unit_scope(unit)
     values = dict(ports)
     for name in unit["order"]:
         node = unit["nodes"][name]
         arguments = {slot: values[target["ref"]] for slot, target in node.get("with", {}).items()}
-        values[name] = implementations[node.get("use", node.get("body"))](**arguments)
+        implementation = implementations[node.get("use", node.get("body"))]
+        instantiate = getattr(implementation, "__mf_instantiate__", None)
+        child_scope = scope if "body" in node else [*scope, name]
+        values[name] = instantiate(arguments, child_scope) if instantiate is not None else implementation(**arguments)
     exports = {}
     for name, target in unit["exports"].items():
         value = values[target["ref"]]
         exports[name] = value[target["export"]] if "export" in target else value
     return values, exports
+
+
+def unit_type_scope(ports, nodes, identities=None, bodies=None):
+    encoded = json.dumps({"ports": ports, "nodes": nodes, "identities": identities or {}, "bodies": bodies or {}}, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode()
+    return ["unit:" + hashlib.sha256(encoded).hexdigest()]
+
+
+def constructor_identity(card):
+    return f"{card['family']}/{card['id']}@{card['version']}#{card['sha256']}"
+
+
+def scoped_factory(factory):
+    import inspect
+    from functools import wraps
+
+    signature = inspect.signature(factory)
+    parameters = list(signature.parameters.values())
+    if not parameters or parameters[0].kind not in {inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD}:
+        raise ModuleIRError("a scoped factory must accept its type scope first")
+    public = signature.replace(parameters=parameters[1:])
+
+    @wraps(factory)
+    def invoke(**bindings):
+        public.bind(**bindings)
+        return factory(None, **bindings)
+
+    def instantiate(bindings, scope):
+        public.bind(**bindings)
+        return factory(scope, **bindings)
+
+    invoke.__signature__ = public
+    invoke.__mf_instantiate__ = instantiate
+    return invoke
+
+
+def unit_scope(unit):
+    return unit_type_scope(unit["ports"], unit["nodes"], unit["identities"], unit["bodies"])

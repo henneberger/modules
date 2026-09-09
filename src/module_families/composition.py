@@ -10,7 +10,7 @@ from typing import Any
 from .associated import resolve_metadata
 from .contracts import Functor, ModuleView, Requirement, Signature
 from .indices import resolve_indices
-from .module_ir import execute_unit, normalize_expression
+from .module_ir import constructor_identity, execute_unit, normalize_expression
 from .planning import plan, select
 
 
@@ -156,22 +156,23 @@ def link_expression(
             signature, result_requirement, identity, factory, raw_exports
         )
 
-    def evaluate(alias, arguments) -> ModuleView:
+    def evaluate(alias, arguments, type_scope=None) -> ModuleView:
         implementation = prepared[alias]
         if implementation.factory is not None:
-            module = implementation.factory(**arguments)
+            module = implementation.factory.instantiate(arguments, type_scope)
         else:
             module = implementation.signature.seal(
                 implementation.raw_exports, identity=implementation.identity
             )
         implementation.requirement.check(module, alias)
         indices = resolve_indices(cards[alias], {slot: child.metadata()["indices"] for slot, child in arguments.items()})
-        associated = resolve_metadata(cards[alias], {slot: child.metadata()["associated"] for slot, child in arguments.items()})
+        associated = module.metadata()["associated"] if implementation.factory is not None else resolve_metadata(cards[alias], {}, scope=[*(type_scope or []), constructor_identity(cards[alias])])
         return module.signature.seal(module, identity=module.identity, indices=indices, associated=associated)
 
     def invoker(alias):
         def invoke(**arguments):
             return evaluate(alias, arguments)
+        invoke.__mf_instantiate__ = lambda arguments, scope: evaluate(alias, arguments, scope)
         return invoke
 
     invokers = {alias: invoker(alias) for alias in prepared}

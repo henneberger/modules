@@ -451,7 +451,7 @@ def _generated_source(spec, import_module):
     lines = [
         f'"""Generated fixed module wiring: {import_module}."""',
         "from module_families.module_runtime import prepare_graph as _prepare, finish_graph as _finish",
-        "from module_families.module_ir import execute_unit as _execute",
+        "from module_families.module_ir import execute_unit as _execute, scoped_factory as _scoped_factory",
     ]
     for i, (_alias, card) in enumerate(sorted(spec["cards"].items())):
         # Both paths originate in validated repository cards, not source text.
@@ -460,9 +460,10 @@ def _generated_source(spec, import_module):
         [
             f"_SPEC = {spec!r}",
             "",
-            "def create("
+            "@_scoped_factory",
+            "def create(_type_scope"
             + (
-                "*, " + ", ".join(sorted(spec["document"]["ports"]))
+                ", *, " + ", ".join(sorted(spec["document"]["ports"]))
                 if spec["document"]["ports"]
                 else ""
             )
@@ -483,9 +484,10 @@ def _generated_source(spec, import_module):
         + "}"
     )
     lines.extend([
-        "    _prepared = _prepare(_SPEC, _raw, _ports)",
-        "    _nodes, _exports = _execute(_SPEC['unit'], _prepared, _ports)",
-        "    return _finish(_SPEC, _nodes)", "", "__all__ = ['create']", "",
+        "    _prepared = _prepare(_SPEC, _raw, _ports, _type_scope)",
+        "    _nodes, _exports = _execute(_SPEC['unit'], _prepared, _ports, type_scope=_type_scope)",
+        "    return _finish(_SPEC, _nodes, _type_scope)", "",
+        "", "__all__ = ['create']", "",
     ])
     source = "\n".join(lines)
     compile(source, "<generated module>", "exec")

@@ -12,6 +12,7 @@ from .contracts import Functor, Requirement
 from .indices import resolve_indices
 from .instance_terms import instance_at, resolve_instances
 from .interfaces import signature_from_spec
+from .module_ir import constructor_identity, unit_scope
 from .registry import canonical_bytes
 
 
@@ -19,8 +20,9 @@ class ModuleLinkError(ValueError):
     """Prepared Python modules violate their declared linking obligations."""
 
 
-def prepare_graph(spec, raw, ports):
+def prepare_graph(spec, raw, ports, type_scope=None):
     """Runtime preflight for generated wiring; performs no search or imports."""
+    type_scope = list(type_scope) if type_scope is not None else unit_scope(spec["unit"])
     signatures = {
         (s["id"], s["version"]): signature_from_spec(s) for s in spec["interfaces"]
     }
@@ -41,18 +43,18 @@ def prepare_graph(spec, raw, ports):
     )
     resolve_instances({"requires": doc["ports"], "instance_sharing": spec.get("instance_sharing", []), "instance_exports": spec.get("instance_exports", {})}, {name: module.metadata() for name, module in ports.items()})
     witnesses = {name: module.metadata()["associated"] for name, module in ports.items()}
-    resolve_metadata({"requires": doc["ports"], "associated": spec.get("associated", {})}, witnesses)
+    resolve_metadata({"requires": doc["ports"], "associated": spec.get("associated", {})}, witnesses, scope=type_scope)
     for alias in spec["order"]:
         card = spec["cards"][alias]
         witnesses[alias] = resolve_metadata(card, {
             slot: witnesses[doc["links"][alias + "." + slot]] for slot in card.get("requires", {})
-        })
+        }, scope=[*type_scope, alias, constructor_identity(card)])
         ref = card["provides"]
         validate_against_interface({"associated": witnesses[alias]}, declarations[(ref["id"], ref["version"])])
     prepared = {}
 
     def factory_invoker(functor, card):
-        def invoke(**arguments):
+        def instantiate(arguments, scope):
             indices = resolve_indices(
                 card,
                 {
@@ -60,11 +62,14 @@ def prepare_graph(spec, raw, ports):
                     for slot, module in arguments.items()
                 },
             )
-            module = functor(**arguments)
+            module = functor.instantiate(arguments, scope)
             return module.signature.seal(
                 module, identity=module.identity, indices=indices, associated=module.metadata()["associated"]
             )
 
+        def invoke(**arguments):
+            return instantiate(arguments, type_scope)
+        invoke.__mf_instantiate__ = instantiate
         return invoke
 
     def raw_invoker(module):
@@ -90,7 +95,7 @@ def prepare_graph(spec, raw, ports):
         )
         if factory:
             functor = Functor(
-                alias,
+                constructor_identity(card),
                 {
                     name: Requirement(signature(ref))
                     for name, ref in card.get("requires", {}).items()
@@ -117,7 +122,7 @@ def prepare_graph(spec, raw, ports):
                 exports,
                 identity=f"artifact:{card['sha256']}",
                 indices=resolve_indices(card, {}),
-                associated=resolve_metadata(card, {}),
+                associated=resolve_metadata(card, {}, scope=[*type_scope, alias, constructor_identity(card)]),
             )
 
             invoke = raw_invoker(module)
@@ -125,8 +130,9 @@ def prepare_graph(spec, raw, ports):
     return prepared
 
 
-def finish_graph(spec, nodes):
+def finish_graph(spec, nodes, type_scope=None):
     """Check final nominal sharing and project the explicitly selected exports."""
+    type_scope = list(type_scope) if type_scope is not None else unit_scope(spec["unit"])
     doc = spec["document"]
     for left, right in doc["constraints"].get("same_type", []):
         a, x = left.split(".")
@@ -156,6 +162,7 @@ def finish_graph(spec, nodes):
         associated=resolve_metadata(
             {"requires": doc["ports"], "associated": spec.get("associated", {})},
             {name: nodes[name].metadata()["associated"] for name in doc["ports"]},
+            scope=type_scope,
         ),
         indices=resolve_indices(
             spec, {name: nodes[name].metadata()["indices"] for name in doc["ports"]}

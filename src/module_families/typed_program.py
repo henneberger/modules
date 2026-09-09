@@ -534,14 +534,22 @@ def _python(report):
     executor_name = "_execute_module_unit"
     while executor_name in names:
         executor_name += "_"
+    scope_name = "_type_scope"
+    while scope_name in names:
+        scope_name += "_"
+    decorator_name = "_scoped_factory"
+    while decorator_name in names:
+        decorator_name += "_"
     lines = [
         "from module_families.ownership import invoke as _invoke, move_owned as _move, drop_owned as _drop, mark_checked as _checked",
         "from module_families.contracts import Requirement as _Requirement",
         "from module_families.typed_associated import specialize_runtime as _specialize, descriptors as _descriptors",
         "from module_families.interfaces import signature_from_spec as _signature",
         "from module_families.instance_terms import resolve_instances as _instances",
+        f"from module_families.module_ir import scoped_factory as {decorator_name}",
         "",
-        "def " + factory_name + "(" + ("*, " + ", ".join(names) if names else "") + "):",
+        "@" + decorator_name,
+        "def " + factory_name + "(" + scope_name + (", *, " + ", ".join(names) if names else "") + "):",
     ]
     for name in names:
         ref = doc["ports"][name]["requires"]
@@ -550,7 +558,7 @@ def _python(report):
         )
     ports = "{" + ", ".join(repr(name) + ": " + name for name in names) + "}"
     lines.append(f"    _instances({report['instance_contract']!r}, {{name: module.metadata() for name, module in {ports}.items()}})")
-    lines.append(f"    _identities = _specialize({report['associated_assumptions']!r}, {ports})")
+    lines.append(f"    _identities = _specialize({report['associated_assumptions']!r}, {ports}, {scope_name})")
     lines.append("    def _d(values): return _descriptors(values, _identities)")
     params = report["parameters"]
     export = doc["program"].get("export", "run")
@@ -624,8 +632,9 @@ def _python(report):
     lines.extend([
         "",
         f"from module_families.module_ir import execute_unit as {executor_name}",
-        "def create(" + ("*, " + ", ".join(names) if names else "") + "):",
-        f"    return {executor_name}({report['unit']!r}, {{{body_name!r}: {factory_name}}}, {ports})[1]",
+        "@" + decorator_name,
+        "def create(" + scope_name + (", *, " + ", ".join(names) if names else "") + "):",
+        f"    return {executor_name}({report['unit']!r}, {{{body_name!r}: {factory_name}}}, {ports}, type_scope={scope_name})[1]",
     ])
     result = "\n".join(lines) + "\n"
     compile(result, "<checked module>", "exec")

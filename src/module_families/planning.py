@@ -16,7 +16,13 @@ from typing import Any
 from .associated import resolve_metadata, validate_associated
 from .indices import resolve_indices, validate_indices
 from .instance_terms import resolve_instances, validate_instances
-from .module_ir import ModuleIRError, compile_unit, normalize_expression
+from .module_ir import (
+    ModuleIRError,
+    compile_unit,
+    constructor_identity,
+    normalize_expression,
+    unit_type_scope,
+)
 
 
 class PlanningError(ValueError):
@@ -165,6 +171,7 @@ def _check(
     allowed: set[str] | None,
     path: str = "$",
     resolved: dict | None = None,
+    type_scope=None,
 ) -> dict:
     if "ref" in expression:
         if resolved is None or expression["ref"] not in resolved:
@@ -172,7 +179,7 @@ def _check(
         return resolved[expression["ref"]]
     if "hole" in expression:
         alias = bindings[expression["hole"]]
-        return _check({"use": alias}, candidates, bindings, allowed, path, resolved)
+        return _check({"use": alias}, candidates, bindings, allowed, path, resolved, type_scope)
     alias = expression["use"]
     card = candidates[alias]
     open_ = _is_open(card)
@@ -196,7 +203,7 @@ def _check(
         concrete["with"] = {}
     for slot in sorted(arguments):
         child = _check(
-            arguments[slot], candidates, bindings, allowed, f"{path}.with.{slot}", resolved
+            arguments[slot], candidates, bindings, allowed, f"{path}.with.{slot}", resolved, type_scope
         )
         expected = card["requires"][slot]
         if child["provides"] != expected:
@@ -245,7 +252,7 @@ def _check(
     except ValueError as error:
         raise _Rejected("semantic-index-mismatch", path, alias, reason=str(error)) from error
     try:
-        associated = resolve_metadata(card, {slot: child["associated"] for slot, child in children.items()})
+        associated = resolve_metadata(card, {slot: child["associated"] for slot, child in children.items()}, scope=[*(type_scope or []), path, constructor_identity(card)])
     except ValueError as error:
         raise _Rejected("associated-type-mismatch", path, alias, reason=str(error)) from error
     try:
@@ -385,8 +392,11 @@ def plan(
         bindings = dict(zip(names, alternatives, strict=True))
         try:
             resolved = {}
+            concrete_nodes = {name: ({"use": bindings[node["hole"]]} if "hole" in node else node) for name, node in graph.nodes.items()}
+            identities = {node["use"]: constructor_identity(cards[node["use"]]) for node in concrete_nodes.values()}
+            type_scope = unit_type_scope({}, concrete_nodes, identities)
             for node_id in graph.order:
-                resolved[node_id] = _check(graph.nodes[node_id], cards, bindings, allowed, node_id, resolved)
+                resolved[node_id] = _check(graph.nodes[node_id], cards, bindings, allowed, node_id, resolved, type_scope)
             checked = resolved[graph.root]
             checked["expression"] = graph.expression(bindings)
             checked["residual_obligations"] = [item for node in resolved.values() for item in node["residual_obligations"]]
@@ -399,7 +409,7 @@ def plan(
                 "expression": checked["expression"],
                 "unit": compile_unit(
                     ports={}, nodes={name: ({"use": bindings[node["hole"]]} if "hole" in node else node) for name, node in graph.nodes.items()},
-                    exports={"module": {"ref": graph.root}}, signature=checked["provides"],
+                    exports={"module": {"ref": graph.root}}, signature=checked["provides"], identities=identities,
                 ),
                 "bindings": bindings,
                 "provides": copy.deepcopy(checked["provides"]),

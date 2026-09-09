@@ -565,6 +565,10 @@ class Functor:
         }
 
     def __call__(self, **bindings: ModuleView) -> ModuleView:
+        return self.instantiate(bindings)
+
+    def instantiate(self, bindings, type_scope=None):
+        type_scope = [*(type_scope if type_scope is not None else ["runtime:" + uuid4().hex]), self.name]
         missing = sorted(set(self.parameters) - set(bindings))
         extra = sorted(set(bindings) - set(self.parameters))
         if missing or extra:
@@ -586,6 +590,7 @@ class Functor:
             associated = resolve_metadata(
                 {"requires": dict(self.parameters), "associated": self.associated},
                 {slot: module.metadata()["associated"] for slot, module in bindings.items()},
+                scope=type_scope,
             )
         except ValueError as error:
             raise ContractError(str(error)) from error
@@ -600,6 +605,7 @@ class Functor:
             raise ContractError(str(error)) from error
         identity_payload = {
             "factory": self.metadata(),
+            "associated": associated,
             "bindings": {
                 name: module.identity for name, module in sorted(bindings.items())
             },
@@ -608,7 +614,12 @@ class Functor:
             identity_payload, sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
         identity = "binding:" + hashlib.sha256(encoded).hexdigest()
-        exports = self.factory(**bindings)
+        instantiate = getattr(self.factory, "__mf_instantiate__", None)
+        exports = instantiate(bindings, type_scope) if instantiate is not None else self.factory(**bindings)
+        if isinstance(exports, ModuleView):
+            witnesses = exports.metadata()["associated"]["types"]
+            if witnesses and witnesses != associated["types"]:
+                raise ContractError("factory result exposes incompatible abstract type witnesses")
         scope = exports.instance_id if isinstance(exports, ModuleView) else uuid4().hex
         try:
             instances = resolve_instances(

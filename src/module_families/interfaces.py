@@ -176,6 +176,8 @@ def _local_term(term: Any, associated: dict) -> dict:
         raise InterfaceError(str(error)) from error
 
     def check(value):
+        if "fresh" in value:
+            raise InterfaceError("signatures declare abstract types through associated variables, not fresh implementation binders")
         if "from" in value:
             raise InterfaceError("interface type terms cannot reference dependency slots")
         if "var" in value:

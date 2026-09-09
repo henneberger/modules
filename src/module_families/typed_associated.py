@@ -72,7 +72,7 @@ def prepare(doc, specs):
                         f"missing or incompatible associated port declaration: {path}"
                     )
                 return bindings[path]
-            if "apply" in node:
+            if "args" in node:
                 node["args"] = [visit(arg) for arg in node["args"]]
             return node
 
@@ -131,8 +131,9 @@ def prepare(doc, specs):
     return scoped_ports, scoped_result, assumptions
 
 
-def specialize_runtime(assumptions, ports):
+def specialize_runtime(assumptions, ports, type_scope=None):
     """Discharge declared equations before any operation or ownership transfer."""
+    from .type_terms import fresh_scope
     if set(ports) != set(assumptions["ports"]):
         raise ValueError("checked program ports differ from certificate")
     metadata = {}
@@ -142,7 +143,7 @@ def specialize_runtime(assumptions, ports):
             {"associated": metadata[name]}, assumptions["ports"][name]
         )
     card = {"requires": assumptions["ports"], "associated": assumptions["associated"]}
-    resolved = resolve_metadata(card, metadata)
+    resolved = resolve_metadata(card, metadata, scope=type_scope)
     validate_against_interface({"associated": resolved}, assumptions["result"])
     registry = resolved["constructors"]
     bindings = {
@@ -151,7 +152,7 @@ def specialize_runtime(assumptions, ports):
         for name, term in spec["types"].items()
     }
     mapping = {
-        key: identity(substitute(term, bindings, registry))
+        key: identity(fresh_scope(substitute(term, bindings, registry), type_scope or []))
         for key, term in assumptions["terms"].items()
     }
     seen = {}
