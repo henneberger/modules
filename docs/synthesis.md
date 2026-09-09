@@ -45,3 +45,29 @@ Still open: richer structural and higher-order signatures, semantic refinements 
 ## Missing requirements as contribution work
 
 `mf plan-contributions GOAL --registry REPOSITORY --out DIRECTORY` retains synthesis diagnostics and prepares authorable handoffs for observed missing providers with published interfaces. It does not turn search cutoffs into absence claims or invent behavioral acceptance cases. See the [executable contribution workflow](contributions.md).
+
+
+## Incremental publication and bounded discovery
+
+Synthesis compares the repository publication revision before and after discovery.
+If publication changes during the search, `status` becomes `incomplete`,
+`complete_for_bounds` is false, and `truncation` includes `repository_changed`.
+The result is not automatically lockable. The contribution planner does not
+interpret this changing view as proof that a provider is absent. Local, HTTP,
+federated, and staged candidate views all participate in this check.
+
+This guards against skipped or duplicated offset pages without retaining a
+historical catalog snapshot. It does not guarantee progress during continuous
+publication; callers can retry, and a retained-snapshot protocol remains future
+work for sustained write-heavy deployments.
+
+An exact `goal.root` is read by immutable identity instead of enumerating unrelated
+providers. The root must still satisfy the declared interface and hash. Its open
+dependencies use ordinary bounded synthesis, including type, effect, and evidence
+checks. This lets the evaluator test one newly submitted candidate even when the
+family contains more providers than the discovery budget.
+
+[Candidate paging measurements](candidate-paging.md) verify that a one-card page
+from a million-row local catalog decodes one card. Broad version predicates and
+deep offsets can still scan scalar index entries; bounded memory is not a promise
+of constant query time for every predicate.

@@ -2,7 +2,8 @@
 
 Current integrated test results and end-to-end checks are recorded in [final-validation.json](final-validation.json). The source artifacts below record the interpreter and scope of each measurement. Tests cover the implemented fragment; they do not establish correctness for arbitrary Python or internet-scale operation.
 
-Version 0.7.0 passes **716 tests and 32 subtests**, Ruff, and wheel construction.
+The current 0.7.0 source passes **747 tests and 32 subtests**, Ruff, and wheel construction.
+The [original 0.7.0 report](final-validation-0.7.json) preserves its 716-test release snapshot.
 It adds the complete staged agent contribution loop and associated
 types inside checked operation bodies. The [live composition record](live-composition-validation.json)
 documents one actual Codex invocation that received six published cards, wrote a
@@ -18,6 +19,14 @@ remains in staging and is absent from the accepted repository. The affected
 campaign, worker, and queue suites pass 45 tests, including failed evaluation →
 repair → independently composed dependency → evidence-required final lock. This
 is a bounded repair example, not a comparative model reliability measurement.
+
+The [candidate-page measurements](candidate-paging.md) use one million synthetic
+catalog rows. A one-result query decodes one card, rather than the full family.
+Tests verify PEP 440 ordering, version filters, family constraints, and bounded card
+decoding. Concurrent-publication tests require an incomplete synthesis result and
+prevent automatic locking or absence handoffs; exact-root tests avoid unrelated
+candidate enumeration. These checks protect discovery correctness and memory
+bounds, without claiming retained snapshots or progress under continuous writes.
 
 The [coordination experiment](coordination-scale.md) exercises one million task
 records, eight worker processes, and 16,000 synthetic accepted workflows. It does

@@ -1,0 +1,112 @@
+{
+  "100k": {
+    "format": "module-families-candidate-paging-benchmark-1",
+    "catalog_rows": 100000,
+    "environment": {
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "python": "3.14.6"
+    },
+    "synthetic_insertion_seconds": 1.9879882498644292,
+    "database_bytes": 66740224,
+    "queries": {
+      "first_one": {
+        "arguments": {
+          "limit": 1
+        },
+        "result_count": 1,
+        "decoded_cards": 1,
+        "seconds": 0.00028016604483127594,
+        "peak_traced_python_bytes": 4536
+      },
+      "first_hundred": {
+        "arguments": {
+          "limit": 100
+        },
+        "result_count": 100,
+        "decoded_cards": 100,
+        "seconds": 0.0010293330997228622,
+        "peak_traced_python_bytes": 128762
+      },
+      "last_one": {
+        "arguments": {
+          "limit": 1,
+          "offset": 99999
+        },
+        "result_count": 1,
+        "decoded_cards": 1,
+        "seconds": 0.004939207807183266,
+        "peak_traced_python_bytes": 5062
+      },
+      "unmatched_specifier": {
+        "arguments": {
+          "limit": 1,
+          "version_spec": ">=2"
+        },
+        "result_count": 0,
+        "decoded_cards": 0,
+        "seconds": 0.11737712472677231,
+        "peak_traced_python_bytes": 3553
+      }
+    },
+    "limits": [
+      "Synthetic catalog rows, not a million wheel publications or agents.",
+      "Tracemalloc measures Python allocations during queries, not native SQLite page caches or process RSS.",
+      "Arbitrary version predicates and deep offsets can scan scalar index entries; returned JSON decoding is bounded."
+    ]
+  },
+  "1m": {
+    "format": "module-families-candidate-paging-benchmark-1",
+    "catalog_rows": 1000000,
+    "environment": {
+      "platform": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+      "python": "3.14.6"
+    },
+    "synthetic_insertion_seconds": 22.994658374693245,
+    "database_bytes": 666025984,
+    "queries": {
+      "first_one": {
+        "arguments": {
+          "limit": 1
+        },
+        "result_count": 1,
+        "decoded_cards": 1,
+        "seconds": 0.0008979169651865959,
+        "peak_traced_python_bytes": 4536
+      },
+      "first_hundred": {
+        "arguments": {
+          "limit": 100
+        },
+        "result_count": 100,
+        "decoded_cards": 100,
+        "seconds": 0.004204416181892157,
+        "peak_traced_python_bytes": 128762
+      },
+      "last_one": {
+        "arguments": {
+          "limit": 1,
+          "offset": 999999
+        },
+        "result_count": 1,
+        "decoded_cards": 1,
+        "seconds": 0.19402204174548388,
+        "peak_traced_python_bytes": 5062
+      },
+      "unmatched_specifier": {
+        "arguments": {
+          "limit": 1,
+          "version_spec": ">=2"
+        },
+        "result_count": 0,
+        "decoded_cards": 0,
+        "seconds": 1.202554749790579,
+        "peak_traced_python_bytes": 3549
+      }
+    },
+    "limits": [
+      "Synthetic catalog rows, not a million wheel publications or agents.",
+      "Tracemalloc measures Python allocations during queries, not native SQLite page caches or process RSS.",
+      "Arbitrary version predicates and deep offsets can scan scalar index entries; returned JSON decoding is bounded."
+    ]
+  }
+}

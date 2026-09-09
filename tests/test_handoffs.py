@@ -146,6 +146,9 @@ def test_policy_mismatch_does_not_request_existing_provider(tmp_path, repo):
 
 def test_invalid_published_candidate_is_not_absence(tmp_path, repo):
     class InvalidRepository:
+        def revision(self):
+            return {"test": "fixed-invalid-catalog"}
+
         def candidates(self, *args, **kwargs):
             return [{"bad": "card"}] if kwargs["offset"] == 0 else []
 

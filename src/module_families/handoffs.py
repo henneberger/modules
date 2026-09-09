@@ -74,7 +74,7 @@ def plan_contributions(goal_source, repository, out, **synthesis_bounds) -> dict
     diagnostics = list(resolution["rejections"])
     tasks, missing = [], []
     # An unsatisfied alternative does not justify new work when a solution exists.
-    if not resolution["solutions"]:
+    if not resolution["solutions"] and "repository_changed" not in resolution["truncation"]:
         references = {
             (row["requires"]["id"], row["requires"]["version"])
             for row in resolution["candidate_counts"]

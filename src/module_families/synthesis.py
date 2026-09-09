@@ -212,6 +212,7 @@ def synthesize(
     ):
         raise SynthesisError("search budgets must be positive integers")
     document = read_goal(source)
+    revision = canonical_bytes(repository.revision())
     bounds = {
         "max_depth": max_depth,
         "max_states": max_states,
@@ -285,13 +286,23 @@ def synthesize(
         return values
 
     def expand(reference, depth, active):
-        for card in candidates(reference):
-            if (
-                depth == 1
-                and "root" in document["goal"]
-                and _identity(card) != _identity(document["goal"]["root"])
-            ):
-                continue
+        if depth == 1 and "root" in document["goal"]:
+            selected = document["goal"]["root"]
+            try:
+                card = repository.lock(
+                    selected["family"], selected["id"], version=selected["version"]
+                )["member"]
+                _cards({_alias(card): card})
+                _capabilities({_alias(card): card})
+                if _identity(card) != _identity(selected) or card["provides"] != reference:
+                    raise SynthesisError("pinned root identity or provided interface mismatch")
+                choices = [card]
+            except (ValueError, KeyError, TypeError) as error:
+                reject({"code": "invalid-pinned-root", "error": str(error)})
+                choices = []
+        else:
+            choices = candidates(reference)
+        for card in choices:
             tick()
             alias, identity = _alias(card), _identity(card)
             if not _is_open({"requires": {}, **card}):
@@ -457,6 +468,13 @@ def synthesize(
             solutions.append(solution)
     except _BudgetExhausted:
         pass
+    revision_unchanged = canonical_bytes(repository.revision()) == revision
+    if not revision_unchanged:
+        limited.add("repository_changed")
+        reject({
+            "code": "repository-changed-during-synthesis",
+            "error": "Publication changed the candidate domain; rerun synthesis before selecting a program.",
+        })
     complete_for_bounds = not limited
     if (
         document.get("preferences", {}).get("selection") == "min_artifacts"
@@ -485,6 +503,7 @@ def synthesize(
         "status": status,
         "complete": complete,
         "complete_for_bounds": complete_for_bounds,
+        "repository_revision": {"sha256": hashlib.sha256(revision).hexdigest(), "unchanged": revision_unchanged},
         "bounds": bounds,
         "visited_states": states,
         "candidate_counts": [

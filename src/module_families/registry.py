@@ -21,11 +21,22 @@ import zipfile
 from contextlib import contextmanager
 from email.parser import BytesParser
 from email.policy import compat32
+from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterator
 
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion, Version
+
+
+@lru_cache(maxsize=4096)
+def _parsed_version(value):
+    return Version(value)
+
+
+def _pep440_compare(left, right):
+    first, second = _parsed_version(left), _parsed_version(right)
+    return (first > second) - (first < second)
 
 
 class RegistryError(ValueError):
@@ -472,6 +483,12 @@ class Registry:
                 CREATE INDEX IF NOT EXISTS members_contract ON members(contract);
                 CREATE VIRTUAL TABLE IF NOT EXISTS member_search USING fts5(text);
                 CREATE INDEX IF NOT EXISTS members_provides ON members(provides_id, provides_version, family);
+                CREATE INDEX IF NOT EXISTS members_candidate_order ON members(
+                    provides_id, provides_version, version COLLATE PEP440 DESC,
+                    family, member, version);
+                CREATE INDEX IF NOT EXISTS members_candidate_family_order ON members(
+                    provides_id, provides_version, family,
+                    version COLLATE PEP440 DESC, member, version);
                 PRAGMA user_version=3;
             """)
 
@@ -480,11 +497,18 @@ class Registry:
         _no_symlinks(self.database)
         connection = sqlite3.connect(self.database, timeout=30)
         connection.row_factory = sqlite3.Row
+        connection.create_collation("PEP440", _pep440_compare)
         try:
             with connection:
                 yield connection
         finally:
             connection.close()
+
+    def revision(self):
+        """Opaque append-only publication generation for optimistic read guards."""
+        with self._connect() as db:
+            row = db.execute("SELECT rowid,digest FROM publications ORDER BY rowid DESC LIMIT 1").fetchone()
+        return {"sequence": row[0] if row else 0, "publication_sha256": row[1] if row else None}
 
     def _blob(self, digest: str) -> Path:
         digest = _hash(digest)
@@ -858,29 +882,31 @@ class Registry:
             specifier = SpecifierSet(version_spec or "")
         except (InvalidSpecifier, TypeError) as exc:
             raise RegistryError(f"Invalid candidate version specifier: {exc}") from exc
+        if limit == 0:
+            return []
         clauses = "provides_id=? AND provides_version=?"
         arguments = [contract_id, contract_version]
         if family is not None:
             clauses += " AND family=?"
             arguments.append(family)
+        # The index carries PEP 440 ordering. Filtering sees only scalar version
+        # strings; JSON card bodies are decoded after SQL LIMIT/OFFSET.
+        if version_spec:
+            clauses += " AND mf_version_matches(version)"
+        arguments.extend((limit, offset))
         with self._connect() as db:
-            cards = [
-                json.loads(row["card"])
-                for row in db.execute(
-                    f"SELECT card FROM members WHERE {clauses} ORDER BY family, member, version",
-                    arguments,
+            if version_spec:
+                db.create_function(
+                    "mf_version_matches", 1,
+                    lambda value: specifier.contains(_parsed_version(value), prereleases=True),
+                    deterministic=True,
                 )
-            ]
-        try:
-            cards = [
-                card
-                for card in cards
-                if specifier.contains(Version(card["version"]), prereleases=True)
-            ]
-            cards.sort(key=lambda card: Version(card["version"]), reverse=True)
-        except InvalidVersion as exc:
-            raise RegistryError(f"Stored candidate has invalid version: {exc}") from exc
-        return cards[offset : offset + limit]
+            rows = db.execute(
+                f"SELECT card FROM members WHERE {clauses} "
+                "ORDER BY version COLLATE PEP440 DESC, family, member, version "
+                "LIMIT ? OFFSET ?", arguments,
+            )
+            return [json.loads(row["card"]) for row in rows]
 
     def lock(
         self,

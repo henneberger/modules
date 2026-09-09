@@ -118,10 +118,20 @@ candidate discovery and synthesis for exhaustive typed selection within declared
 bounds. `inspect` without a version selects the highest PEP 440 version across
 shards; this is deterministic and does not compare unrelated publication clocks.
 
-Pagination is deterministic for an unchanged shard set. There is no cross-shard
-snapshot transaction: concurrent incremental publication can shift offset pages.
-Use immutable locks to retain a selected program. Snapshot tokens or append-only
-cursors would be a further protocol extension, not a property of this adapter.
+Pagination is deterministic for an unchanged shard set. Each repository exposes
+an append-only publication revision through `revision()` and `/v1/revision`;
+federation returns a vector over its named shards. Synthesis records the revision
+before discovery and checks it again before reporting completeness. A change
+produces an `incomplete` result with `repository_changed`; it cannot become an
+automatically selected lock or an absence-based contribution handoff. Rerun the
+search against the updated catalog.
+
+This is an optimistic stability check, not a retained snapshot or a cross-shard
+transaction. It conservatively rejects even unrelated publication during search.
+Constant publication can cause repeated retries. Snapshot retention or stable
+cursors would be needed to guarantee search progress under uninterrupted writes.
+Direct callers that combine pages themselves must compare revisions too. Use
+immutable locks to retain a program selected from a stable view.
 
 ## What this contributes to scale
 
@@ -136,3 +146,9 @@ successfully coordinate. Query fan-out and exact collision checks still grow wit
 the configured shard count. Routing directories, authenticated immutable publisher
 identities, cross-shard snapshots, and larger deployment benchmarks require further
 work before expanding beyond the explicit 32-shard bound.
+
+
+Candidate pages are bounded within each local shard, not just in the federation
+response: SQL indexes supply PEP 440 ordering and only selected card bodies are
+decoded. See [candidate paging](candidate-paging.md) for million-row measurements,
+deep-offset costs, and arbitrary version-filter scan limits.

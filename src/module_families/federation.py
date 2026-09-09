@@ -69,6 +69,9 @@ class FederatedRegistry:
         self._objects = {}
         self._artifacts = {}
 
+    def revision(self):
+        return {name: shard.revision() for name, shard in self.shards.items()}
+
     @staticmethod
     def _pagination(limit, offset):
         if (

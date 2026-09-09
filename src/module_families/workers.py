@@ -40,6 +40,9 @@ class OverlayRepository:
     def __init__(self, *repositories):
         self.repositories = repositories
 
+    def revision(self):
+        return [repository.revision() for repository in self.repositories]
+
     def _merged(self, method, *args, **kwargs):
         rows = {}
         for repository in self.repositories:

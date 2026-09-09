@@ -3,15 +3,15 @@
   "version": "0.7.0",
   "python": "3.14.6",
   "tests": {
-    "passed": 747,
+    "passed": 716,
     "subtests_passed": 32,
-    "seconds": 67.39,
+    "seconds": 61.85,
     "command": ".venv/bin/pytest -q --tb=short"
   },
   "ruff": "passed: src tests scripts examples adaptations/associated adaptations/knowledge adaptations/transactions",
   "release_wheel": {
     "path": "dist/module-families/module_families-0.7.0-py3-none-any.whl",
-    "sha256": "22efe791d696e46000638ced3781cc47d2b934776c7da864e176ce0ed535b0b5",
+    "sha256": "f24f6706a8a30d4b5183a45568471263907fe3c5efde28743d158dfd8bb5893a",
     "built": true
   },
   "agent_composition": {
@@ -68,15 +68,6 @@
     "Declared associated witnesses and ordinary Python bodies remain trusted; no metatheoretic soundness proof or fresh generative identities.",
     "Clean candidate environments are not an OS sandbox; untrusted code requires operator-provided isolation.",
     "Repository federation is bounded read federation, without distributed snapshots or consensus.",
-    "Evidence authenticates finite observations and configured evaluator identities, not universal behavior or the best possible solution.",
-    "Publication revision checks are optimistic: continuous writes can force retries; retained catalog snapshots are not implemented."
-  ],
-  "prior_release_report": "final-validation-0.7.json",
-  "post_release_fixes": {
-    "repair": "live-repair-validation.json",
-    "bounded_candidate_paging": "candidate-paging-validation.json",
-    "concurrent_publication_guard": true,
-    "exact_root_avoids_domain_enumeration": true,
-    "historical_examples": "Earlier agent/model and offline replay records retain their original measured environments; new tests cover the changed query path."
-  }
+    "Evidence authenticates finite observations and configured evaluator identities, not universal behavior or the best possible solution."
+  ]
 }

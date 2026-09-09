@@ -167,6 +167,7 @@ def make_server(
                     "/v1/interface": registry.interface,
                     "/v1/interfaces": registry.interfaces,
                     "/v1/candidates": registry.candidates,
+                    "/v1/revision": registry.revision,
                 }
                 if url.path not in routes:
                     self.fail("Unknown repository endpoint", 404)
@@ -344,6 +345,23 @@ class RemoteRegistry:
             return json.loads(content)
         except (ValueError, UnicodeDecodeError) as error:
             raise RegistryError("Repository returned invalid JSON") from error
+
+    def revision(self):
+        record = self._request("/v1/revision")
+        if (
+            not isinstance(record, dict)
+            or set(record) != {"sequence", "publication_sha256"}
+            or type(record["sequence"]) is not int
+            or record["sequence"] < 0
+        ):
+            raise RegistryError("invalid repository publication revision")
+        digest = record["publication_sha256"]
+        if record["sequence"] == 0:
+            if digest is not None:
+                raise RegistryError("empty repository revision must have no publication")
+        else:
+            _hash(digest)
+        return record
 
     def publish(self, index_path: Path) -> dict:
         index_path = _root_path(Path(index_path))

@@ -373,6 +373,10 @@ not a proof of arbitrary Python behavior.
 The durable queue supports remote authenticated workers, atomic claims, lease
 renewal, stale-worker fencing, immutable prerequisite DAGs, and crash recovery.
 A million task records have been exercised with eight real worker processes.
+Separately, [million-row discovery measurements](docs/candidate-paging.md) show
+that requesting one candidate decodes one card. Synthesis detects publication
+changes during its search and requires a retry rather than silently claiming a
+complete selection from changing pages.
 See the [coordination measurements](docs/coordination-scale.md) for throughput,
 resource use, and the distinction between records and active agents. A Python
 virtual environment isolates dependencies; untrusted candidate execution still
