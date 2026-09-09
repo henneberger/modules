@@ -65,7 +65,7 @@ def validate_interface_reference(reference: Any) -> dict[str, str]:
 
 
 def _interpret(spec: Any) -> Signature:
-    spec = _shape(spec, {"id", "version", "callables", "types", "typing", "associated"}, "interface")
+    spec = _shape(spec, {"id", "version", "callables", "types", "typing", "associated", "instances"}, "interface")
     reference = validate_interface_reference(
         {key: spec.get(key) for key in ("id", "version")}
     )
@@ -132,7 +132,7 @@ def _interpret(spec: Any) -> Signature:
         parsed[export] = CallableSpec(shape, asynchronous=asynchronous)
     try:
         return Signature(
-            reference["id"], reference["version"], parsed, types=tuple(sorted(types))
+            reference["id"], reference["version"], parsed, types=tuple(sorted(types)), instances=spec.get("instances", ())
         )
     except ContractError as error:
         raise InterfaceError(str(error)) from error

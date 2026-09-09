@@ -10,6 +10,7 @@ import hashlib
 from .associated import resolve_metadata, validate_against_interface
 from .contracts import Functor, Requirement
 from .indices import resolve_indices
+from .instance_terms import resolve_instances
 from .interfaces import signature_from_spec
 from .registry import canonical_bytes
 
@@ -38,6 +39,7 @@ def prepare_graph(spec, raw, ports):
     resolve_indices(
         spec, {name: module.metadata()["indices"] for name, module in ports.items()}
     )
+    resolve_instances({"requires": doc["ports"], "instance_sharing": spec.get("instance_sharing", []), "instance_exports": spec.get("instance_exports", {})}, {name: module.metadata() for name, module in ports.items()})
     witnesses = {name: module.metadata()["associated"] for name, module in ports.items()}
     resolve_metadata({"requires": doc["ports"], "associated": spec.get("associated", {})}, witnesses)
     for alias in spec["order"]:
@@ -97,6 +99,8 @@ def prepare_graph(spec, raw, ports):
                 raw[alias],
                 sharing=card.get("sharing", ()),
                 associated=card.get("associated", {}),
+                instance_sharing=card.get("instance_sharing", ()),
+                instance_exports=card.get("instance_exports", {}),
             )
 
             invoke = factory_invoker(functor, card)
@@ -148,6 +152,10 @@ def finish_graph(spec, nodes):
             for name, path in doc["exports"].items()
         },
         identity="graph:" + hashlib.sha256(canonical_bytes(spec)).hexdigest(),
+        instances=resolve_instances(
+            {"requires": doc["ports"], "instance_sharing": spec.get("instance_sharing", []), "instance_exports": spec.get("instance_exports", {})},
+            {name: nodes[name].metadata() for name in doc["ports"]},
+        ),
         associated=resolve_metadata(
             {"requires": doc["ports"], "associated": spec.get("associated", {})},
             {name: nodes[name].metadata()["associated"] for name in doc["ports"]},

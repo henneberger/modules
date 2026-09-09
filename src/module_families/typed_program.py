@@ -53,6 +53,8 @@ def read_program(source):
             "program",
             "policy",
             "associated",
+            "instance_sharing",
+            "instance_exports",
         },
         "checked program",
     )
@@ -461,6 +463,20 @@ def check_program(source, repository):
         for ref in references
     }
     interfaces = [specs[key] for key in sorted(specs)]
+    from .instance_terms import validate_instance_interface
+
+    instance_contract = {
+        "requires": {name: port["requires"] for name, port in doc["ports"].items()},
+        "instance_sharing": doc.get("instance_sharing", []),
+        "instance_exports": doc.get("instance_exports", {}),
+    }
+    public = doc["module"]["provides"]
+    try:
+        validate_instance_interface(instance_contract, specs[(public["id"], public["version"])], {
+            name: specs[(port["requires"]["id"], port["requires"]["version"])] for name, port in doc["ports"].items()
+        })
+    except ValueError as error:
+        raise TypeCheckError(str(error)) from error
     from .typed_associated import prepare
 
     try:
@@ -474,6 +490,7 @@ def check_program(source, repository):
         "source_sha256": hashlib.sha256(text.encode()).hexdigest(),
         "interfaces": interfaces,
         "associated_assumptions": assumptions,
+        "instance_contract": instance_contract,
         "parameters": checker.parameters,
         "returns": checker.returns,
         "types": checker.types,
@@ -502,6 +519,7 @@ def _python(report):
         "from module_families.contracts import Requirement as _Requirement",
         "from module_families.typed_associated import specialize_runtime as _specialize, descriptors as _descriptors",
         "from module_families.interfaces import signature_from_spec as _signature",
+        "from module_families.instance_terms import resolve_instances as _instances",
         "",
         "def create(" + ("*, " + ", ".join(names) if names else "") + "):",
     ]
@@ -511,6 +529,7 @@ def _python(report):
             f"    _Requirement(_signature({specs[(ref['id'], ref['version'])]!r})).check({name}, {name!r})"
         )
     ports = "{" + ", ".join(repr(name) + ": " + name for name in names) + "}"
+    lines.append(f"    _instances({report['instance_contract']!r}, {{name: module.metadata() for name, module in {ports}.items()}})")
     lines.append(f"    _identities = _specialize({report['associated_assumptions']!r}, {ports})")
     lines.append("    def _d(values): return _descriptors(values, _identities)")
     params = report["parameters"]
@@ -617,6 +636,8 @@ def build_program(source, repository, out):
         "capabilities": doc["module"].get("capabilities", []),
         "implementation_trust": "checked-composition",
         "associated": report["associated_assumptions"]["associated"],
+        "instance_sharing": report["instance_contract"]["instance_sharing"],
+        "instance_exports": report["instance_contract"]["instance_exports"],
         "checked_program": {
             "format": FORMAT,
             "certificate_sha256": report["sha256"],
@@ -646,6 +667,7 @@ def build_program(source, repository, out):
                 "requires": member["requires"],
                 "interfaces": report["interfaces"],
                 "associated_assumptions": report["associated_assumptions"],
+                "instance_contract": report["instance_contract"],
                 "guarantees": report["guarantees"],
                 "trusted_operations": report["trusted_operations"],
             }

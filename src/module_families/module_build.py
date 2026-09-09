@@ -84,6 +84,7 @@ def read_module(source):
             "exports",
             "indices",
             "associated",
+            "instance_exports",
             "constraints",
             "policy",
         },
@@ -115,12 +116,19 @@ def read_module(source):
         "exports",
         "indices",
         "associated",
+        "instance_exports",
         "constraints",
         "policy",
     ):
         doc.setdefault(key, {})
         if not isinstance(doc[key], dict):
             raise ModuleBuildError(f"{key} must be a table")
+    for name, path in doc["instance_exports"].items():
+        _name(name)
+        if not isinstance(path, str) or len(path.split(".")) not in {1, 2}:
+            raise ModuleBuildError("instance exports require node or port paths")
+        for part in path.split("."):
+            _name(part)
     _shape(doc["associated"], {"types", "constructors"}, "associated graph types")
     if not isinstance(doc["associated"].get("types", {}), dict):
         raise ModuleBuildError("associated.types must be a table")
@@ -286,25 +294,18 @@ def _check_graph(doc, cards, repository):
             raise ModuleBuildError(f"contract mismatch: {target} <- {provider}")
         if provider in cards:
             pending[alias].add(provider)
-    order = []
-    while pending:
-        ready = sorted(alias for alias, deps in pending.items() if not deps)
-        if not ready:
-            raise ModuleBuildError(f"initialization cycle: {sorted(pending)}")
-        order.extend(ready)
-        for alias in ready:
-            del pending[alias]
-        for deps in pending.values():
-            deps.difference_update(ready)
-    for left, right in doc["constraints"].get("same_instance", []):
-        if (
-            left not in doc["links"]
-            or right not in doc["links"]
-            or doc["links"][left] != doc["links"][right]
-        ):
-            raise ModuleBuildError(
-                f"instance sharing requires the same named node or port: {left}, {right}"
-            )
+    from .module_ir import ModuleIRError, dependency_order
+
+    try:
+        order = list(dependency_order(pending))
+    except ModuleIRError as error:
+        raise ModuleBuildError(str(error)) from error
+    from .instance_terms import graph_instances
+
+    try:
+        instances = graph_instances(doc, cards, order)
+    except ValueError as error:
+        raise ModuleBuildError(str(error)) from error
     sharing = []
     for left, right in doc["constraints"].get("same_type", []):
         identities = []
@@ -333,10 +334,20 @@ def _check_graph(doc, cards, repository):
             raise ModuleBuildError(
                 f"export call contract mismatch: {name} <- {path}; use an explicit adapter"
             )
+    from .instance_terms import validate_instance_interface
+
+    for alias, card in cards.items():
+        validate_instance_interface(card, signatures[alias], {
+            slot: specs[(ref["id"], ref["version"])] for slot, ref in card.get("requires", {}).items()
+        })
+    validate_instance_interface({"requires": doc["ports"], **instances}, result, {
+        name: signatures[name] for name in doc["ports"]
+    })
     associated = graph_associated(doc, cards, order, specs)
     # Every selected node/port must contribute to the public dependency graph.
     used = {path.split(".")[0] for path in doc["exports"].values()}
     used.update(path.split(".")[0] for path in doc["indices"].values())
+    used.update(path.split(".")[0] for path in doc["instance_exports"].values())
     def associated_dependencies(term):
         if "from" in term:
             used.add(term["from"].split(".")[0])
@@ -378,6 +389,7 @@ def _check_graph(doc, cards, repository):
         "sharing": sharing,
         **_symbolic_indices(doc, cards, order),
         **associated,
+        **instances,
     }
 
 
@@ -587,6 +599,8 @@ def build_module(
             for name in (
                 "module_build.py",
                 "module_runtime.py",
+                "module_ir.py",
+                "instance_terms.py",
                 "indices.py",
                 "contracts.py",
                 "interfaces.py",
@@ -670,7 +684,7 @@ def build_module(
         },
         **{
             key: selected[key]
-            for key in ("index_exports", "index_requires", "index_sharing", "associated")
+            for key in ("index_exports", "index_requires", "index_sharing", "associated", "instance_exports", "instance_sharing")
         },
     }
     index = _validate_index(
@@ -725,6 +739,8 @@ def build_module(
                     for key in ("index_exports", "index_requires", "index_sharing")
                 },
                 "associated": member["associated"],
+                "instance_exports": member["instance_exports"],
+                "instance_sharing": member["instance_sharing"],
                 "obligations": [
                     "Python behavior and declared semantic identities require independent conformance evidence"
                 ],

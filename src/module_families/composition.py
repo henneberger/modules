@@ -10,6 +10,7 @@ from typing import Any
 from .associated import resolve_metadata
 from .contracts import Functor, ModuleView, Requirement, Signature
 from .indices import resolve_indices
+from .module_ir import normalize_expression
 from .planning import plan, select
 
 
@@ -26,25 +27,6 @@ class _Prepared:
     raw_exports: Mapping[str, Any] | None
 
 
-def _reject_holes(expression: Any, active: set[int] | None = None) -> None:
-    if not isinstance(expression, dict):
-        return  # The planner supplies the structural diagnostic.
-    if "hole" in expression:
-        raise CompositionError(
-            "link_expression requires a concrete tree; select and fill every hole first"
-        )
-    active = set() if active is None else active
-    if id(expression) in active:
-        raise CompositionError(
-            "recursive expression objects are unsupported; supply a finite JSON tree"
-        )
-    active.add(id(expression))
-    arguments = expression.get("with")
-    if isinstance(arguments, dict):
-        for child in arguments.values():
-            _reject_holes(child, active)
-    active.remove(id(expression))
-
 
 def link_expression(
     expression: dict,
@@ -54,25 +36,9 @@ def link_expression(
     *,
     types: Mapping[str, type] | None = None,
 ) -> ModuleView:
-    """Interpret ``{use: alias, with: {slot: expression}}`` after metadata preflight.
-
-    `exports` contains values already loaded through a caller-verified import
-    bundle. Candidate artifact references must correspond to those verified
-    locks: this interpreter neither imports code nor verifies that association.
-    `signatures` maps exact (contract ID, version) pairs to runtime signatures.
-    `types` optionally fixes nominal identities from a shared type library.
-
-    All selected representations, exports, signature references, and factory
-    call shapes are checked before invoking a factory. Concrete metadata is
-    checked by plan() and select(); holes are rejected even if uniquely solvable.
-    Runtime sharing and result conformance are checked as applications evaluate.
-
-    Each factory occurrence creates a fresh instance; there is no let-binding,
-    result memoization, or recursive expression support. Raw class/function
-    values remain the supplied objects. Behavioral obligations are not proved,
-    and failures do not roll back Python effects or previously invoked factories.
-    """
-    _reject_holes(expression)
+    graph = normalize_expression(expression)
+    if any("hole" in node for node in graph.nodes.values()):
+        raise CompositionError("select and fill every module hole before execution")
     if not isinstance(exports, Mapping):
         raise CompositionError(
             "exports must map verified candidate aliases to loaded values"
@@ -100,7 +66,7 @@ def link_expression(
     # selected code. The planner validates the cards as finite JSON declarations.
     cards = deepcopy(candidates)
     selected = select(plan(expression, cards))
-    concrete = selected["expression"]
+    graph = normalize_expression(selected["expression"])
     loaded = dict(exports)
     runtime_signatures = dict(signatures)
 
@@ -166,6 +132,8 @@ def link_expression(
                 loaded[alias],
                 sharing=card.get("sharing", ()),
                 associated=card.get("associated", {}),
+                instance_sharing=card.get("instance_sharing", ()),
+                instance_exports=card.get("instance_exports", {}),
             )
         elif card.get("kind") == "module":
             if not isinstance(loaded[alias], Mapping):
@@ -189,13 +157,15 @@ def link_expression(
             signature, result_requirement, identity, factory, raw_exports
         )
 
+    instances = {}
+
     def evaluate(node: dict) -> ModuleView:
         alias = node["use"]
         implementation = prepared[alias]
         arguments = {}
         if implementation.factory is not None:
             arguments = {
-                slot: evaluate(child)
+                slot: instances[child["ref"]]
                 for slot, child in sorted(node.get("with", {}).items())
             }
             module = implementation.factory(**arguments)
@@ -208,7 +178,9 @@ def link_expression(
         associated = resolve_metadata(cards[alias], {slot: child.metadata()["associated"] for slot, child in arguments.items()})
         return module.signature.seal(module, identity=module.identity, indices=indices, associated=associated)
 
-    return evaluate(concrete)
+    for node_id in graph.order:
+        instances[node_id] = evaluate(graph.nodes[node_id])
+    return instances[graph.root]
 
 
 __all__ = ["CompositionError", "link_expression"]

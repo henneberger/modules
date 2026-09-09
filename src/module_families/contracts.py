@@ -224,6 +224,7 @@ class Signature:
         default_factory=dict
     )
     types: tuple[str, ...] = ()
+    instances: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _text(self.id, "contract id")
@@ -251,6 +252,13 @@ class Signature:
             )
         object.__setattr__(self, "callables", MappingProxyType(specs))
         object.__setattr__(self, "types", names)
+        if not isinstance(self.instances, (tuple, list)):
+            raise ContractError("instance roles must be a sequence of names")
+        for name in self.instances:
+            _name(name, "instance role")
+        if len(set(self.instances)) != len(self.instances):
+            raise ContractError("instance roles must be distinct")
+        object.__setattr__(self, "instances", tuple(self.instances))
 
     def reference(self) -> dict[str, str]:
         return {"id": self.id, "version": self.version}
@@ -262,6 +270,7 @@ class Signature:
                 name: spec.metadata() for name, spec in sorted(self.callables.items())
             },
             "types": sorted(self.types),
+            **({"instances": sorted(self.instances)} if self.instances else {}),
         }
 
     def check(self, exports: Mapping[str, Any]) -> None:
@@ -291,6 +300,7 @@ class Signature:
         identity: str | None = None,
         indices: Mapping[str, str] | None = None,
         associated: Mapping[str, Any] | None = None,
+        instances: Mapping[str, str] | None = None,
     ) -> ModuleView:
         """Validate exports and expose only declared names through a read-only view.
 
@@ -309,15 +319,15 @@ class Signature:
                 )
         if identity is None:
             identity = f"local:{uuid4().hex}"
-        return ModuleView(exports, self, identity, indices=indices, associated=associated)
+        return ModuleView(exports, self, identity, indices=indices, associated=associated, instances=instances)
 
 
 class ModuleView(Mapping[str, Any]):
     """A read-only export projection, not a sandbox or a deep freeze."""
 
-    __slots__ = ("_exports", "_signature", "_identity", "_instance_id", "_indices", "_associated")
+    __slots__ = ("_exports", "_signature", "_identity", "_instance_id", "_indices", "_associated", "_instances")
 
-    def __init__(self, exports: Mapping[str, Any], signature: Signature, identity: str, *, indices=None, associated=None):
+    def __init__(self, exports: Mapping[str, Any], signature: Signature, identity: str, *, indices=None, associated=None, instances=None):
         # Public construction checks too, so callers cannot accidentally bypass
         # conformance by skipping Signature.seal(). Requirement rechecks on bind.
         if not isinstance(signature, Signature):
@@ -330,7 +340,23 @@ class ModuleView(Mapping[str, Any]):
         object.__setattr__(self, "_exports", MappingProxyType(selected))
         object.__setattr__(self, "_signature", signature)
         object.__setattr__(self, "_identity", identity)
-        object.__setattr__(self, "_instance_id", uuid4().hex)
+        object.__setattr__(self, "_instance_id", exports.instance_id if isinstance(exports, ModuleView) else uuid4().hex)
+        if isinstance(exports, ModuleView):
+            if instances is None:
+                instances = exports.metadata()["instances"]
+            if indices is None:
+                indices = exports.metadata()["indices"]
+            if associated is None:
+                associated = exports.metadata()["associated"]
+        if instances is not None and (not isinstance(instances, Mapping) or any(
+            not isinstance(k, str) or not k.isidentifier() or not isinstance(v, str) or not v
+            for k, v in instances.items()
+        )):
+            raise ContractError("instance roles must map identifiers to nonempty identities")
+        missing_roles = set(signature.instances) - set(instances or {})
+        if missing_roles:
+            raise ContractError(f"missing public instance roles: {sorted(missing_roles)}")
+        object.__setattr__(self, "_instances", MappingProxyType({name: instances[name] for name in signature.instances}))
         if indices is not None and (not isinstance(indices, Mapping) or any(
             not isinstance(k, str) or not k.isidentifier() or not isinstance(v, str) or not v
             for k, v in indices.items()
@@ -387,6 +413,7 @@ class ModuleView(Mapping[str, Any]):
             "provides": self.provides,
             "identity": self.identity,
             "instance_id": self.instance_id,
+            "instances": dict(self._instances),
             "indices": dict(self._indices),
             "associated": copy.deepcopy(self._associated),
         }
@@ -430,6 +457,9 @@ class Requirement:
                 f"requires {self.signature.reference()!r}"
             )
         self.signature.check(module)
+        missing_roles = set(self.signature.instances) - set(module.metadata()["instances"])
+        if missing_roles:
+            raise ContractError(f"missing dependency instance roles: {sorted(missing_roles)}")
         for name, expected in self.types.items():
             if module[name] is not expected:
                 raise ContractError(
@@ -452,6 +482,8 @@ class Functor:
     factory: Callable[..., Mapping[str, Any]]
     sharing: tuple[tuple[str, str], ...] = ()
     associated: Mapping[str, Any] = field(default_factory=dict)
+    instance_sharing: tuple[tuple[str, str], ...] = ()
+    instance_exports: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _text(self.name, "factory name")
@@ -502,6 +534,19 @@ class Functor:
         declaration = copy.deepcopy(dict(self.associated))
         validate_associated({"requires": dict(parameters), "associated": declaration})
         object.__setattr__(self, "associated", declaration)
+        from .instance_terms import validate_instances
+
+        validate_instances({"requires": parameters, "instance_sharing": self.instance_sharing, "instance_exports": dict(self.instance_exports)})
+        object.__setattr__(self, "instance_sharing", tuple(tuple(pair) for pair in self.instance_sharing))
+        object.__setattr__(self, "instance_exports", MappingProxyType(dict(self.instance_exports)))
+        if set(self.instance_exports) != set(self.result.instances):
+            raise ContractError("constructor instance exports differ from result signature")
+        paths = list(self.instance_exports.values())
+        paths.extend(path for pair in self.instance_sharing for path in pair)
+        for path in paths:
+            slot, separator, role = path.partition(".")
+            if separator and role not in parameters[slot].signature.instances:
+                raise ContractError(f"instance role is not exposed by dependency signature: {path}")
 
     def metadata(self) -> dict[str, Any]:
         return {
@@ -513,6 +558,8 @@ class Functor:
             "result": self.result.reference(),
             "sharing": [list(pair) for pair in self.sharing],
             "associated": copy.deepcopy(self.associated),
+            "instance_sharing": [list(pair) for pair in self.instance_sharing],
+            "instance_exports": dict(self.instance_exports),
         }
 
     def __call__(self, **bindings: ModuleView) -> ModuleView:
@@ -540,6 +587,15 @@ class Functor:
             )
         except ValueError as error:
             raise ContractError(str(error)) from error
+        from .instance_terms import resolve_instances
+
+        try:
+            instances = resolve_instances(
+                {"requires": dict(self.parameters), "instance_sharing": self.instance_sharing, "instance_exports": dict(self.instance_exports)},
+                {slot: module.metadata() for slot, module in bindings.items()},
+            )
+        except ValueError as error:
+            raise ContractError(str(error)) from error
         identity_payload = {
             "factory": self.metadata(),
             "bindings": {
@@ -551,7 +607,7 @@ class Functor:
         ).encode("utf-8")
         identity = "binding:" + hashlib.sha256(encoded).hexdigest()
         exports = self.factory(**bindings)
-        return self.result.seal(exports, identity=identity, associated=associated)
+        return self.result.seal(exports, identity=identity, associated=associated, instances=instances or None)
 
 
 __all__ = [

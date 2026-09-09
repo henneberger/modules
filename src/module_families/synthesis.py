@@ -127,42 +127,23 @@ def validate_selection(
     document = read_goal(request)
     if type(max_depth) is not int or not 1 <= max_depth <= 64:
         raise SynthesisError("max_depth must be an integer from 1 to 64")
-    used = set()
+    from .module_ir import ModuleIRError, normalize_expression
 
-    def visit(node, depth, active):
-        if (
-            not isinstance(node, dict)
-            or set(node) - {"use", "with"}
-            or node.get("use") not in cards
-        ):
-            raise SynthesisError("invalid synthesized expression")
-        if depth > max_depth:
-            raise SynthesisError("synthesized expression exceeds its declared depth")
-        alias = node["use"]
-        used.add(alias)
-        card = cards[alias]
-        identity = _identity(card)
-        next_active = active
-        if _is_open({"requires": {}, **card}):
-            if identity in active:
-                raise SynthesisError(
-                    "constructor artifact repeats on an expression path"
-                )
-            next_active = active | {identity}
-        children = node.get("with", {})
-        if not isinstance(children, dict):
-            raise SynthesisError("synthesized arguments must be a mapping")
-        for child in children.values():
-            visit(child, depth + 1, next_active)
-
-    visit(expression, 1, set())
-    if "root" in document["goal"] and _identity(cards[expression["use"]]) != _identity(
+    try:
+        graph = normalize_expression(expression, max_depth=max_depth)
+    except ModuleIRError as error:
+        raise SynthesisError(str(error)) from error
+    if any("use" not in node or node["use"] not in cards for node in graph.nodes.values()):
+        raise SynthesisError("invalid synthesized expression")
+    used = graph.used()
+    root_alias = graph.nodes[graph.root]["use"]
+    if "root" in document["goal"] and _identity(cards[root_alias]) != _identity(
         document["goal"]["root"]
     ):
         raise SynthesisError("selected root differs from the required exact artifact")
     if used != set(cards):
         raise SynthesisError("synthesized candidates differ from the used expression")
-    if cards[expression["use"]]["provides"] != document["goal"]["requires"]:
+    if cards[root_alias]["provides"] != document["goal"]["requires"]:
         raise SynthesisError(
             "synthesized result does not provide the requested interface"
         )
@@ -360,6 +341,11 @@ def synthesize(
         for card in cards.values():
             ref = card["provides"]
             validate_against_interface(card, interfaces[(ref["id"], ref["version"])])
+            from .instance_terms import validate_instance_interface
+
+            validate_instance_interface(card, interfaces[(ref["id"], ref["version"])], {
+                slot: interfaces[(requirement["id"], requirement["version"])] for slot, requirement in card.get("requires", {}).items()
+            })
         return [interfaces[key] for key in sorted(selected)]
 
     def artifact_count(cards):
@@ -380,6 +366,13 @@ def synthesize(
     solutions, seen_solutions = [], set()
     try:
         for expression, cards in expand(document["goal"]["requires"], 1, set()):
+            from .module_ir import ModuleIRError, satisfy_instance_sharing
+
+            try:
+                expression = satisfy_instance_sharing(expression, cards)
+            except ModuleIRError as error:
+                reject({"code": "instance-sharing-mismatch", "reason": str(error)})
+                continue
             encoded = canonical_bytes(expression)
             if encoded in seen_solutions:
                 continue

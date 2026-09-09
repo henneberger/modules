@@ -16,6 +16,7 @@ from packaging.version import Version
 
 from .composition import link_expression
 from .contracts import ModuleView
+from .instance_terms import validate_instance_interface
 from .interfaces import (
     signature_from_spec,
     validate_interface,
@@ -62,22 +63,15 @@ def _policy(policy: Any) -> dict:
 
 
 def _used(expression: Any, depth: int = 0) -> set[str]:
-    if depth > 64:
-        raise AssemblyError("module expression exceeds depth 64")
-    if not isinstance(expression, dict) or set(expression) - {"use", "with"}:
-        raise AssemblyError(
-            "assembly expressions contain use and optional with bindings"
-        )
-    alias = expression.get("use")
-    _alias(alias)
-    arguments = expression.get("with", {})
-    if not isinstance(arguments, dict):
-        raise AssemblyError("expression.with must be a table of named module arguments")
-    result = {alias}
-    for name, child in arguments.items():
-        _alias(name)
-        result.update(_used(child, depth + 1))
-    return result
+    from .module_ir import ModuleIRError, normalize_expression
+
+    try:
+        graph = normalize_expression(expression, max_depth=64 - depth)
+    except ModuleIRError as error:
+        raise AssemblyError(str(error)) from error
+    if any("hole" in node for node in graph.nodes.values()):
+        raise AssemblyError("assembly expressions must fill every module hole")
+    return graph.used()
 
 
 def read_assembly(source: str | Path | dict) -> dict:
@@ -344,6 +338,9 @@ def resolve_assembly(
                 from .associated import validate_against_interface
 
                 provided = card["provides"]
+                validate_instance_interface(card, interfaces[(provided["id"], provided["version"])], {
+                    slot: interfaces[(ref["id"], ref["version"])] for slot, ref in card.get("requires", {}).items()
+                })
                 validate_against_interface(
                     card, interfaces[(provided["id"], provided["version"])]
                 )
@@ -597,6 +594,9 @@ def _verify_assembly(lock: dict, repository=None, *, trust_keys=None) -> dict:
 
         provided = cards[alias]["provides"]
         try:
+            validate_instance_interface(cards[alias], interface_specs[(provided["id"], provided["version"])], {
+                slot: interface_specs[(ref["id"], ref["version"])] for slot, ref in cards[alias].get("requires", {}).items()
+            })
             validate_against_interface(
                 cards[alias], interface_specs[(provided["id"], provided["version"])]
             )

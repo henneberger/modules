@@ -15,6 +15,8 @@ from typing import Any
 
 from .associated import resolve_metadata, validate_associated
 from .indices import resolve_indices, validate_indices
+from .instance_terms import resolve_instances, validate_instances
+from .module_ir import ModuleIRError, normalize_expression
 
 
 class PlanningError(ValueError):
@@ -108,6 +110,7 @@ def _cards(candidates: Any) -> dict[str, dict]:
                 raise PlanningError(f"{alias}: invalid type export {name!r}")
             _text(identity, f"{alias}.type_exports.{name}")
         card["type_exports"] = type_exports
+        validate_instances(card)
         validate_indices(card)
         validate_associated(card)
         result[alias] = card
@@ -161,10 +164,15 @@ def _check(
     bindings: dict,
     allowed: set[str] | None,
     path: str = "$",
+    resolved: dict | None = None,
 ) -> dict:
+    if "ref" in expression:
+        if resolved is None or expression["ref"] not in resolved:
+            raise PlanningError("unresolved module reference")
+        return resolved[expression["ref"]]
     if "hole" in expression:
         alias = bindings[expression["hole"]]
-        return _check({"use": alias}, candidates, bindings, allowed, path)
+        return _check({"use": alias}, candidates, bindings, allowed, path, resolved)
     alias = expression["use"]
     card = candidates[alias]
     open_ = _is_open(card)
@@ -188,7 +196,7 @@ def _check(
         concrete["with"] = {}
     for slot in sorted(arguments):
         child = _check(
-            arguments[slot], candidates, bindings, allowed, f"{path}.with.{slot}"
+            arguments[slot], candidates, bindings, allowed, f"{path}.with.{slot}", resolved
         )
         expected = card["requires"][slot]
         if child["provides"] != expected:
@@ -200,8 +208,9 @@ def _check(
                 actual=child["provides"],
             )
         children[slot] = child
-        concrete["with"][slot] = child["expression"]
-        residuals.extend(child["residual_obligations"])
+        concrete["with"][slot] = (dict(arguments[slot]) if "ref" in arguments[slot] else child["expression"])
+        if resolved is None:
+            residuals.extend(child["residual_obligations"])
         selected.update(child["selected"])
         effects.update(child["effects"])
     unresolved_effects = effects & {"unknown", "dependency-effects"}
@@ -239,6 +248,10 @@ def _check(
         associated = resolve_metadata(card, {slot: child["associated"] for slot, child in children.items()})
     except ValueError as error:
         raise _Rejected("associated-type-mismatch", path, alias, reason=str(error)) from error
+    try:
+        instances = resolve_instances(card, children)
+    except ValueError as error:
+        raise _Rejected("instance-sharing-mismatch", path, alias, reason=str(error)) from error
     for left, right in card.get("sharing", []):
         left_slot, left_type = left.split(".")
         right_slot, right_type = right.split(".")
@@ -284,6 +297,8 @@ def _check(
     )
     return {
         "expression": concrete,
+        "instance_id": path,
+        "instances": instances,
         "provides": card["provides"],
         "effects": sorted(effects),
         "type_exports": card["type_exports"],
@@ -318,7 +333,13 @@ def plan(
         else set(_strings(allowed_effects, "allowed_effects"))
     )
     holes: dict[str, dict] = {}
-    _expression(expression, cards, holes)
+    try:
+        graph = normalize_expression(expression)
+    except ModuleIRError as error:
+        raise PlanningError(str(error)) from error
+    for node in graph.nodes.values():
+        shallow = {key: value for key, value in node.items() if key != "with"}
+        _expression(shallow, cards, holes)
     rejections: dict[str, dict] = {}
     rejection_count = 0
 
@@ -363,7 +384,12 @@ def plan(
         visited += 1
         bindings = dict(zip(names, alternatives, strict=True))
         try:
-            checked = _check(expression, cards, bindings, allowed)
+            resolved = {}
+            for node_id in graph.order:
+                resolved[node_id] = _check(graph.nodes[node_id], cards, bindings, allowed, node_id, resolved)
+            checked = resolved[graph.root]
+            checked["expression"] = graph.expression(bindings)
+            checked["residual_obligations"] = [item for node in resolved.values() for item in node["residual_obligations"]]
         except _Rejected as rejected:
             reject({**rejected.record, "bindings": bindings})
             continue
