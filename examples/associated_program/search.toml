@@ -1,49 +1,31 @@
 schema_version = 1
 
 [family]
-description = "Generic checked SQLite knowledge-base search"
 name = "typed-knowledge"
 version = "1.0.0"
+description = "Generic checked SQLite knowledge-base search"
 
 [publisher]
 name = "programs"
 
-[associated]
-sharing = [[{ from = "prepare.QuerySyntax", kind = "identity" }, { from = "index.QuerySyntax", kind = "identity" }]]
-
-[associated.types]
-
-[associated.types.DocumentId]
-from = "index.DocumentId"
-kind = "shared"
-
 [module]
-capabilities = ["citation-search"]
 id = "search"
-summary = "Checked knowledge-base query preparation and citation search"
 version = "1.0.0"
-
-[module.provides]
-id = "kb.generic.search"
-version = "1"
-
-[policy]
-allowed_effects = ["sqlite"]
+provides = "kb.generic.search@1"
+summary = "Prepare a query and search an index with matching query syntax"
+capabilities = ["citation-search"]
 
 [ports]
+prepare = "kb.generic.query@1"
+index = "kb.generic.index@1"
 
-[ports.index]
-
-[ports.index.requires]
-id = "kb.generic.index"
-version = "1"
-
-[ports.prepare]
-
-[ports.prepare.requires]
-id = "kb.generic.query"
-version = "1"
+[associated]
+sharing = [["prepare.QuerySyntax", "index.QuerySyntax"]]
+types.DocumentId = "index.DocumentId"
 
 [program]
 source = "search.mfl"
 export = "search"
+
+[policy]
+allowed_effects = ["sqlite"]

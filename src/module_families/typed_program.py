@@ -42,6 +42,12 @@ def read_program(source):
     if path.suffix != ".toml":
         raise TypeCheckError("program manifest must be TOML")
     doc = tomllib.loads(path.read_text())
+    from .module_syntax import normalize_authoring
+
+    try:
+        normalize_authoring(doc)
+    except ValueError as error:
+        raise TypeCheckError(str(error)) from error
     _shape(
         doc,
         {
@@ -372,8 +378,8 @@ class _Checker:
             if asynchronous:
                 call = ast.copy_location(ast.Await(value=call), node)
             cleanup = self.call(call, copy.deepcopy(env))
-            if cleanup["returns"] or len(cleanup["parameters"]) != 1 or cleanup["parameters"][0]["mode"] != "move":
-                self.fail(node, "cleanup must consume the resource and return no values")
+            if any(value["usage"] != "shared" for value in cleanup["returns"]) or len(cleanup["parameters"]) != 1 or cleanup["parameters"][0]["mode"] != "move":
+                self.fail(node, "cleanup must consume the resource and cannot discard owned results")
             cleanups[outcome] = cleanup
         scope = {"name": "_resource_" + str(node.lineno), "asynchronous": asynchronous}
         self.managed[name] = scope
@@ -696,7 +702,7 @@ def _python(report):
                 scope = statement["scope"]
                 success, failure = statement["success"], statement["failure"]
                 cls = "_AsyncResourceScope" if scope["asynchronous"] else "_ResourceScope"
-                lines.append(indent + f"{scope['name']} = {cls}({statement['owner']}, {success['port']}[{success['export']!r}], {failure['port']}[{failure['export']!r}], _d({success['parameters']!r}), _d({failure['parameters']!r}))")
+                lines.append(indent + f"{scope['name']} = {cls}({statement['owner']}, {success['port']}[{success['export']!r}], {failure['port']}[{failure['export']!r}], _d({success['parameters']!r}), _d({failure['parameters']!r}), _d({success['returns']!r}), _d({failure['returns']!r}))")
                 lines.append(indent + ("async with " if scope["asynchronous"] else "with ") + scope["name"] + ":")
                 emit(statement["body"], indent + "    ")
             elif kind == "return":

@@ -287,7 +287,7 @@ def _release_borrow(handle: Owned) -> None:
 
 
 class ResourceScope:
-    def __init__(self, handle, success, failure, success_parameters, failure_parameters):
+    def __init__(self, handle, success, failure, success_parameters, failure_parameters, success_returns=(), failure_returns=()):
         if not isinstance(handle, Owned):
             raise OwnershipError("resource scopes require an owned handle")
         for function, parameters in ((success, success_parameters), (failure, failure_parameters)):
@@ -296,11 +296,17 @@ class ResourceScope:
             _spec(parameters[0], parameter=True)
             if parameters[0]["mode"] != "move" or parameters[0]["id"] != handle.type_id or parameters[0]["usage"] != handle.usage:
                 raise OwnershipError("resource cleanup must consume the acquired owner")
+        for spec in (*success_returns, *failure_returns):
+            _spec(spec, parameter=False)
+            if spec["usage"] != "shared":
+                raise OwnershipError("resource cleanup cannot discard owned results")
         self.handle = handle
         self.success = success
         self.failure = failure
         self.success_parameters = success_parameters
         self.failure_parameters = failure_parameters
+        self.success_returns = success_returns
+        self.failure_returns = failure_returns
         self.closed = False
 
     def __enter__(self):
@@ -313,7 +319,7 @@ class ResourceScope:
     def complete(self):
         if not self.closed:
             self.closed = True
-            invoke(self.success, [self.handle], self.success_parameters, [])
+            invoke(self.success, [self.handle], self.success_parameters, self.success_returns)
 
     def __exit__(self, exception_type, exception, traceback):
         if not self.closed:
@@ -321,7 +327,7 @@ class ResourceScope:
                 self.complete()
             else:
                 self.closed = True
-                invoke(self.failure, [self.handle], self.failure_parameters, [])
+                invoke(self.failure, [self.handle], self.failure_parameters, self.failure_returns)
         return False
 
 
@@ -394,11 +400,11 @@ class AsyncResourceScope(ResourceScope):
     async def __aenter__(self):
         return self.__enter__()
 
-    async def release(self, function, parameters):
+    async def release(self, function, parameters, returns):
         import asyncio
 
         async def cleanup():
-            await invoke_async(function, [self.handle], parameters, [])
+            await invoke_async(function, [self.handle], parameters, returns)
         pending = asyncio.create_task(cleanup())
         cancelled = False
         while not pending.done():
@@ -413,7 +419,7 @@ class AsyncResourceScope(ResourceScope):
     async def complete(self):
         if not self.closed:
             self.closed = True
-            await self.release(self.success, self.success_parameters)
+            await self.release(self.success, self.success_parameters, self.success_returns)
 
     async def __aexit__(self, exception_type, exception, traceback):
         if not self.closed:
@@ -421,5 +427,5 @@ class AsyncResourceScope(ResourceScope):
                 await self.complete()
             else:
                 self.closed = True
-                await self.release(self.failure, self.failure_parameters)
+                await self.release(self.failure, self.failure_parameters, self.failure_returns)
         return False

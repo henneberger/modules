@@ -1,0 +1,27 @@
+schema_version = 1
+
+[family]
+name = "typed-knowledge"
+version = "1.0.0"
+description = "Generic checked SQLite knowledge-base search"
+
+[publisher]
+name = "stdlib"
+
+[source]
+root = "src"
+package = "kb_fts"
+license_files = ["../../LICENSE"]
+
+[[members]]
+id = "cached_query"
+version = "1.0.0"
+kind = "functor"
+symbol = "kb_fts:create_cached_parser"
+summary = "Memoize query preparation while preserving its abstract query syntax"
+provides = { id = "kb.generic.query", version = "1" }
+requires.base = { id = "kb.generic.query", version = "1" }
+effects = ["memory", "dependency-effects"]
+implementation_trust = "trusted-python"
+mixin = { base = "base", overrides = ["prepare"] }
+associated.types.QuerySyntax = { from = "base.QuerySyntax", kind = "identity" }

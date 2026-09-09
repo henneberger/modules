@@ -1,0 +1,23 @@
+schema_version = 1
+members = []
+
+[family]
+name = "transactions"
+version = "1.0.0"
+description = "Typed resource protocols for local transactions"
+
+[publisher]
+name = "interfaces"
+
+[[interfaces]]
+id = "transactions.write_read"
+version = "1"
+
+[interfaces.callables]
+run = { parameters = [{ name = "key", kind = "POSITIONAL_OR_KEYWORD", required = true }, { name = "value", kind = "POSITIONAL_OR_KEYWORD", required = true }] }
+
+[interfaces.typing.types]
+Text = { id = "python.str", usage = "shared", representation = "str" }
+
+[interfaces.typing.operations]
+run = { parameters = { key = { type = "Text", mode = "share" }, value = { type = "Text", mode = "share" } }, returns = ["Text"], effects = ["sqlite"] }

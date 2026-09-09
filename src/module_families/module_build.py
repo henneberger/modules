@@ -70,6 +70,12 @@ def read_module(source):
         if path.suffix != ".toml":
             raise ModuleBuildError("module build authoring must be TOML")
         doc = tomllib.loads(path.read_text())
+    from .module_syntax import normalize_authoring
+
+    try:
+        normalize_authoring(doc, graph=True)
+    except ValueError as error:
+        raise ModuleBuildError(str(error)) from error
     canonical_bytes(doc)
     _shape(
         doc,
@@ -282,6 +288,9 @@ def _check_graph(doc, cards, repository):
     signatures = {
         alias: specs[(ref["id"], ref["version"])] for alias, ref in references.items()
     }
+    from .module_syntax import associated_paths
+
+    doc = {**doc, "associated": associated_paths(doc["associated"], signatures)}
     expected_links = {
         f"{alias}.{slot}"
         for alias, card in cards.items()
@@ -613,6 +622,7 @@ def build_module(
             for name in (
                 "module_build.py",
                 "module_runtime.py",
+                "module_syntax.py",
                 "module_ir.py",
                 "instance_terms.py",
                 "refinement.py",

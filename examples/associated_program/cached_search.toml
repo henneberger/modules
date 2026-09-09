@@ -1,0 +1,38 @@
+schema_version = 1
+
+[family]
+name = "typed-knowledge"
+version = "1.0.0"
+description = "Generic checked SQLite knowledge-base search"
+
+[publisher]
+name = "systems"
+
+[module]
+id = "cached_search"
+version = "1.0.0"
+provides = "kb.generic.search@1"
+summary = "Add memoization to query preparation before composing knowledge-base search"
+
+[nodes.prepare]
+use = "typed-knowledge/sqlite.phrase"
+
+[nodes.cached]
+use = "typed-knowledge/stdlib.cached_query"
+with = { base = "prepare" }
+
+[nodes.index]
+use = "typed-knowledge/sqlite.fts"
+
+[nodes.search]
+use = "typed-knowledge/programs.search"
+with = { prepare = "cached", index = "index" }
+
+[exports]
+search = "search.search"
+
+[associated.types]
+DocumentId = "search.DocumentId"
+
+[policy]
+allowed_effects = ["sqlite", "memory"]

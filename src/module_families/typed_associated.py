@@ -51,7 +51,9 @@ def prepare(doc, specs):
             if name in registry and registry[name] != declaration:
                 raise ValueError(f"associated constructor conflict: {name}")
             registry[name] = declaration
-    associated = deepcopy(doc.get("associated", {}))
+    from .module_syntax import associated_paths
+
+    associated = associated_paths(doc.get("associated", {}), ports)
     associated["constructors"] = registry
     card = {"requires": doc["ports"], "associated": associated}
     validate_associated(card)

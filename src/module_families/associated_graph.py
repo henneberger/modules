@@ -37,7 +37,11 @@ def graph_associated(doc, cards, order, interfaces):
     def spec(reference):
         return interfaces[(reference["id"], reference["version"])]
 
-    own = doc.get("associated", {})
+    from .module_syntax import associated_paths
+
+    signatures = {name: spec(card["provides"]) for name, card in cards.items()}
+    signatures.update({name: spec(port["requires"]) for name, port in doc["ports"].items()})
+    own = associated_paths(doc.get("associated", {}), signatures)
     constructors = _merge([
         *(value.get("associated", {}).get("constructors", {}) for value in interfaces.values()),
         *(card.get("associated", {}).get("constructors", {}) for card in cards.values()),

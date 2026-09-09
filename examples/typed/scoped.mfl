@@ -1,0 +1,4 @@
+with resource(store.begin(), success=store.commit, failure=store.abort) as session:
+    store.put(session, key, value)
+    observed = store.read(session, key)
+    return observed

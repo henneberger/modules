@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from functools import cache
 
 DOCUMENTS = [
     (
@@ -32,6 +33,10 @@ def create_parser():
         return '"' + query.replace('"', '""') + '"'
 
     return {"prepare": prepare}
+
+
+def create_cached_parser(*, base):
+    return {"prepare": cache(base["prepare"])}
 
 
 def create_index():
