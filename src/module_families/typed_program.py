@@ -484,6 +484,19 @@ def check_program(source, repository):
         checker = _Checker(doc, text, [*imports.values(), result], imports, result)
     except ValueError as error:
         raise TypeCheckError(str(error)) from error
+    from .module_ir import compile_unit
+
+    body_name = "_checked_body"
+    while body_name in doc["ports"]:
+        body_name += "_"
+    unit = compile_unit(
+        ports=doc["ports"],
+        nodes={body_name: {"body": body_name, "with": {name: {"ref": name} for name in doc["ports"]}}},
+        exports={doc["program"].get("export", "run"): {"ref": body_name, "export": doc["program"].get("export", "run")}},
+        signature=doc["module"]["provides"],
+        equations={"associated": assumptions, "instances": instance_contract},
+        bodies={body_name: checker.ir},
+    )
     report = {
         "format": FORMAT,
         "document": doc,
@@ -495,7 +508,7 @@ def check_program(source, repository):
         "returns": checker.returns,
         "types": checker.types,
         "effects": sorted(checker.effects),
-        "ir": checker.ir,
+        "unit": unit,
         "trusted_operations": checker.boundary,
         "guarantees": {
             "nominal_value_types": True,
@@ -514,6 +527,13 @@ def _python(report):
     doc = report["document"]
     specs = {(spec["id"], spec["version"]): spec for spec in report["interfaces"]}
     names = sorted(doc["ports"])
+    body_name = next(iter(report["unit"]["bodies"]))
+    factory_name = "_make_checked_body"
+    while factory_name in names:
+        factory_name += "_"
+    executor_name = "_execute_module_unit"
+    while executor_name in names:
+        executor_name += "_"
     lines = [
         "from module_families.ownership import invoke as _invoke, move_owned as _move, drop_owned as _drop, mark_checked as _checked",
         "from module_families.contracts import Requirement as _Requirement",
@@ -521,7 +541,7 @@ def _python(report):
         "from module_families.interfaces import signature_from_spec as _signature",
         "from module_families.instance_terms import resolve_instances as _instances",
         "",
-        "def create(" + ("*, " + ", ".join(names) if names else "") + "):",
+        "def " + factory_name + "(" + ("*, " + ", ".join(names) if names else "") + "):",
     ]
     for name in names:
         ref = doc["ports"][name]["requires"]
@@ -597,10 +617,16 @@ def _python(report):
                 lines.append(indent + "else:")
                 emit(statement["else"], indent + "    ")
 
-    emit(report["ir"], "        ")
+    emit(report["unit"]["bodies"][body_name], "        ")
     lines.append(
         f"    return {{{export!r}: _checked(_entry, _d({params!r}), _d({report['returns']!r}))}}"
     )
+    lines.extend([
+        "",
+        f"from module_families.module_ir import execute_unit as {executor_name}",
+        "def create(" + ("*, " + ", ".join(names) if names else "") + "):",
+        f"    return {executor_name}({report['unit']!r}, {{{body_name!r}: {factory_name}}}, {ports})[1]",
+    ])
     result = "\n".join(lines) + "\n"
     compile(result, "<checked module>", "exec")
     return result

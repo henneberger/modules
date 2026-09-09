@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 
 def validate_instances(card):
     requirements = card.get("requires", {})
@@ -27,7 +29,11 @@ def validate_instances(card):
     for name, value in exports.items():
         if not isinstance(name, str) or not name.isidentifier():
             raise ValueError(f"invalid instance role: {name}")
-        path(value)
+        if isinstance(value, dict):
+            if set(value) != {"local"} or not isinstance(value["local"], str) or not value["local"]:
+                raise ValueError("local instance declarations require a nonempty local identity")
+        else:
+            path(value)
 
 
 def instance_at(path, dependencies):
@@ -42,13 +48,36 @@ def instance_at(path, dependencies):
     return module["instances"][role]
 
 
-def resolve_instances(card, dependencies):
+def resolve_instances(card, dependencies, *, scope=None, witnesses=None):
     validate_instances(card)
     for left, right in card.get("instance_sharing", []):
         a, b = instance_at(left, dependencies), instance_at(right, dependencies)
         if a != b:
             raise ValueError(f"instance sharing conflict: {left} != {right}")
-    return {name: instance_at(path, dependencies) for name, path in card.get("instance_exports", {}).items()}
+    result, locals_ = {}, {}
+    for name, path in card.get("instance_exports", {}).items():
+        if isinstance(path, dict):
+            label = path["local"]
+            if scope is None:
+                continue
+            identity = (witnesses or {}).get(name, f"{scope}/local:{label}")
+            if label in locals_ and locals_[label] != identity:
+                raise ValueError(f"local instance aliases disagree: {label}")
+            locals_[label] = identity
+            result[name] = identity
+        else:
+            result[name] = instance_at(path, dependencies)
+            if witnesses is not None and name in witnesses and witnesses[name] != result[name]:
+                raise ValueError(f"exported instance does not preserve its dependency: {name}")
+    if witnesses is not None:
+        labels = {}
+        for label, identity in locals_.items():
+            if identity in labels and labels[identity] != label:
+                raise ValueError("distinct local instance declarations share one witness")
+            if identity in {module["instance_id"] for module in dependencies.values()} | {value for module in dependencies.values() for value in module.get("instances", {}).values()}:
+                raise ValueError("a local instance declaration aliases an input dependency")
+            labels[identity] = label
+    return result
 
 
 def graph_instances(doc, cards, order):
@@ -92,7 +121,7 @@ def graph_instances(doc, cards, order):
             equal(lookup(dependency(left)), lookup(dependency(right)))
         values[alias] = {
             "instance_id": "node:" + alias,
-            "instances": {name: lookup(dependency(path)) for name, path in card.get("instance_exports", {}).items()},
+            "instances": {name: ("node:" + alias + "/local:" + path["local"] if isinstance(path, dict) else lookup(dependency(path))) for name, path in card.get("instance_exports", {}).items()},
         }
     for left, right in doc["constraints"].get("same_instance", []):
         if left not in doc["links"] or right not in doc["links"]:
@@ -101,9 +130,7 @@ def graph_instances(doc, cards, order):
     exports = {}
     for name, path in doc.get("instance_exports", {}).items():
         value = lookup(path)
-        if not value.startswith("port:"):
-            raise ValueError(f"instance export {name} must preserve a public dependency identity")
-        exports[name] = value.removeprefix("port:")
+        exports[name] = value.removeprefix("port:") if value.startswith("port:") else {"local": hashlib.sha256(value.encode()).hexdigest()}
     return {"instance_sharing": residual, "instance_exports": exports}
 
 
@@ -118,6 +145,8 @@ def validate_instance_interface(card, interface, dependencies=None):
     paths = list(card.get("instance_exports", {}).values())
     paths.extend(path for pair in card.get("instance_sharing", []) for path in pair)
     for path in paths:
+        if isinstance(path, dict):
+            continue
         slot, separator, role = path.partition(".")
         if separator and role not in dependencies[slot].get("instances", []):
             raise ValueError(f"instance role is not exposed by dependency signature: {path}")

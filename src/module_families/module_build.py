@@ -287,19 +287,17 @@ def _check_graph(doc, cards, repository):
         raise ModuleBuildError(
             f"unfilled or extra ports: missing={sorted(expected_links - set(doc['links']))}, extra={sorted(set(doc['links']) - expected_links)}"
         )
-    pending = {alias: set() for alias in cards}
     for target, provider in doc["links"].items():
         alias, slot = target.split(".")
         if cards[alias]["requires"][slot] != references[provider]:
             raise ModuleBuildError(f"contract mismatch: {target} <- {provider}")
-        if provider in cards:
-            pending[alias].add(provider)
-    from .module_ir import ModuleIRError, dependency_order
+    from .module_ir import ModuleIRError, lower_graph
 
     try:
-        order = list(dependency_order(pending))
+        unit = lower_graph(doc, cards)
     except ModuleIRError as error:
         raise ModuleBuildError(str(error)) from error
+    order = unit["order"]
     from .instance_terms import graph_instances
 
     try:
@@ -384,6 +382,7 @@ def _check_graph(doc, cards, repository):
         effects.add("dependency-effects")
     return {
         "order": order,
+        "unit": unit,
         "interfaces": [specs[key] for key in sorted(specs)],
         "effects": sorted(effects),
         "sharing": sharing,
@@ -452,6 +451,7 @@ def _generated_source(spec, import_module):
     lines = [
         f'"""Generated fixed module wiring: {import_module}."""',
         "from module_families.module_runtime import prepare_graph as _prepare, finish_graph as _finish",
+        "from module_families.module_ir import execute_unit as _execute",
     ]
     for i, (_alias, card) in enumerate(sorted(spec["cards"].items())):
         # Both paths originate in validated repository cards, not source text.
@@ -482,16 +482,11 @@ def _generated_source(spec, import_module):
         )
         + "}"
     )
-    lines.extend(
-        ["    _prepared = _prepare(_SPEC, _raw, _ports)", "    _nodes = dict(_ports)"]
-    )
-    for alias in spec["order"]:
-        args = ", ".join(
-            f"{slot!r}: _nodes[{spec['document']['links'][f'{alias}.{slot}']!r}]"
-            for slot in sorted(spec["cards"][alias].get("requires", {}))
-        )
-        lines.append(f"    _nodes[{alias!r}] = _prepared[{alias!r}](**{{{args}}})")
-    lines.extend(["    return _finish(_SPEC, _nodes)", "", "__all__ = ['create']", ""])
+    lines.extend([
+        "    _prepared = _prepare(_SPEC, _raw, _ports)",
+        "    _nodes, _exports = _execute(_SPEC['unit'], _prepared, _ports)",
+        "    return _finish(_SPEC, _nodes)", "", "__all__ = ['create']", "",
+    ])
     source = "\n".join(lines)
     compile(source, "<generated module>", "exec")
     return source

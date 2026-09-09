@@ -538,12 +538,14 @@ class Functor:
 
         validate_instances({"requires": parameters, "instance_sharing": self.instance_sharing, "instance_exports": dict(self.instance_exports)})
         object.__setattr__(self, "instance_sharing", tuple(tuple(pair) for pair in self.instance_sharing))
-        object.__setattr__(self, "instance_exports", MappingProxyType(dict(self.instance_exports)))
+        object.__setattr__(self, "instance_exports", MappingProxyType(copy.deepcopy(dict(self.instance_exports))))
         if set(self.instance_exports) != set(self.result.instances):
             raise ContractError("constructor instance exports differ from result signature")
         paths = list(self.instance_exports.values())
         paths.extend(path for pair in self.instance_sharing for path in pair)
         for path in paths:
+            if isinstance(path, dict):
+                continue
             slot, separator, role = path.partition(".")
             if separator and role not in parameters[slot].signature.instances:
                 raise ContractError(f"instance role is not exposed by dependency signature: {path}")
@@ -607,6 +609,16 @@ class Functor:
         ).encode("utf-8")
         identity = "binding:" + hashlib.sha256(encoded).hexdigest()
         exports = self.factory(**bindings)
+        scope = exports.instance_id if isinstance(exports, ModuleView) else uuid4().hex
+        try:
+            instances = resolve_instances(
+                {"requires": dict(self.parameters), "instance_sharing": self.instance_sharing, "instance_exports": dict(self.instance_exports)},
+                {slot: module.metadata() for slot, module in bindings.items()},
+                scope=scope,
+                witnesses=exports.metadata()["instances"] if isinstance(exports, ModuleView) else None,
+            )
+        except ValueError as error:
+            raise ContractError(str(error)) from error
         return self.result.seal(exports, identity=identity, associated=associated, instances=instances or None)
 
 

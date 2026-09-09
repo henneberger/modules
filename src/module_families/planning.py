@@ -16,7 +16,7 @@ from typing import Any
 from .associated import resolve_metadata, validate_associated
 from .indices import resolve_indices, validate_indices
 from .instance_terms import resolve_instances, validate_instances
-from .module_ir import ModuleIRError, normalize_expression
+from .module_ir import ModuleIRError, compile_unit, normalize_expression
 
 
 class PlanningError(ValueError):
@@ -249,7 +249,7 @@ def _check(
     except ValueError as error:
         raise _Rejected("associated-type-mismatch", path, alias, reason=str(error)) from error
     try:
-        instances = resolve_instances(card, children)
+        instances = resolve_instances(card, children, scope=path)
     except ValueError as error:
         raise _Rejected("instance-sharing-mismatch", path, alias, reason=str(error)) from error
     for left, right in card.get("sharing", []):
@@ -397,6 +397,10 @@ def plan(
         solutions.append(
             {
                 "expression": checked["expression"],
+                "unit": compile_unit(
+                    ports={}, nodes={name: ({"use": bindings[node["hole"]]} if "hole" in node else node) for name, node in graph.nodes.items()},
+                    exports={"module": {"ref": graph.root}}, signature=checked["provides"],
+                ),
                 "bindings": bindings,
                 "provides": copy.deepcopy(checked["provides"]),
                 "effects": checked["effects"],

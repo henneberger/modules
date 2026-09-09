@@ -10,7 +10,7 @@ import hashlib
 from .associated import resolve_metadata, validate_against_interface
 from .contracts import Functor, Requirement
 from .indices import resolve_indices
-from .instance_terms import resolve_instances
+from .instance_terms import instance_at, resolve_instances
 from .interfaces import signature_from_spec
 from .registry import canonical_bytes
 
@@ -152,10 +152,7 @@ def finish_graph(spec, nodes):
             for name, path in doc["exports"].items()
         },
         identity="graph:" + hashlib.sha256(canonical_bytes(spec)).hexdigest(),
-        instances=resolve_instances(
-            {"requires": doc["ports"], "instance_sharing": spec.get("instance_sharing", []), "instance_exports": spec.get("instance_exports", {})},
-            {name: nodes[name].metadata() for name in doc["ports"]},
-        ),
+        instances={name: instance_at(path, {key: module.metadata() for key, module in nodes.items()}) for name, path in doc.get("instance_exports", {}).items()},
         associated=resolve_metadata(
             {"requires": doc["ports"], "associated": spec.get("associated", {})},
             {name: nodes[name].metadata()["associated"] for name in doc["ports"]},

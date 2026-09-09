@@ -10,7 +10,7 @@ from typing import Any
 from .associated import resolve_metadata
 from .contracts import Functor, ModuleView, Requirement, Signature
 from .indices import resolve_indices
-from .module_ir import normalize_expression
+from .module_ir import execute_unit, normalize_expression
 from .planning import plan, select
 
 
@@ -66,7 +66,6 @@ def link_expression(
     # selected code. The planner validates the cards as finite JSON declarations.
     cards = deepcopy(candidates)
     selected = select(plan(expression, cards))
-    graph = normalize_expression(selected["expression"])
     loaded = dict(exports)
     runtime_signatures = dict(signatures)
 
@@ -157,17 +156,9 @@ def link_expression(
             signature, result_requirement, identity, factory, raw_exports
         )
 
-    instances = {}
-
-    def evaluate(node: dict) -> ModuleView:
-        alias = node["use"]
+    def evaluate(alias, arguments) -> ModuleView:
         implementation = prepared[alias]
-        arguments = {}
         if implementation.factory is not None:
-            arguments = {
-                slot: instances[child["ref"]]
-                for slot, child in sorted(node.get("with", {}).items())
-            }
             module = implementation.factory(**arguments)
         else:
             module = implementation.signature.seal(
@@ -178,9 +169,14 @@ def link_expression(
         associated = resolve_metadata(cards[alias], {slot: child.metadata()["associated"] for slot, child in arguments.items()})
         return module.signature.seal(module, identity=module.identity, indices=indices, associated=associated)
 
-    for node_id in graph.order:
-        instances[node_id] = evaluate(graph.nodes[node_id])
-    return instances[graph.root]
+    def invoker(alias):
+        def invoke(**arguments):
+            return evaluate(alias, arguments)
+        return invoke
+
+    invokers = {alias: invoker(alias) for alias in prepared}
+    _, projected = execute_unit(selected["unit"], invokers, {})
+    return projected["module"]
 
 
 __all__ = ["CompositionError", "link_expression"]
