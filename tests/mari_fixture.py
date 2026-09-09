@@ -7,7 +7,7 @@ import tomllib
 from collections import Counter
 from pathlib import Path
 
-from .catalog import Catalog
+from module_families.catalog import Catalog
 
 GUIDANCE = {
     "retrieval.fusion.reciprocal_rank_fusion": {
@@ -121,8 +121,8 @@ INTERFACES = [
 
 def generate_mari(project: str | Path, destination: str | Path) -> dict:
     """Adapt the copied candidate with compact discovery and seven annotations."""
-    from .authoring import draft_family
-    from .manifest import write_manifest
+    from module_families.authoring import draft_family
+    from module_families.manifest import write_manifest
 
     project, destination = Path(project).resolve(), Path(destination).resolve()
     if destination.suffix != ".toml":

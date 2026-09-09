@@ -1,19 +1,12 @@
 # Module Families
 
-**A module system for software projects built by millions of agents.**
+**A typed module language and build system for composing ordinary Python.**
 
-Our goal is to let millions of agents contribute to one software project through small, typed, independently composable units of work. An agent should be able to work on a ranking algorithm, storage adapter, or retrieval subsystem against a precise local contract. Other agents should be able to discover that contribution, check whether it fits, and compose it into a larger program.
+Module Families lets independent contributors build small, typed units of software and compose them into larger systems. Signatures describe requirements, shared types constrain compatibility, and the build layer checks compositions before producing executable Python packages.
 
 This requires more than distributing smaller packages. We need to express what a component needs, which types and resources it shares with its neighbors, how its behavior can be extended, and which combinations are valid. Module Families brings ideas from ML module systems into Python's build and distribution layer, with ordinary Python as the implementation language.
 
 The project combines a build system, a checked composition language, and a repository. Its central idea is that the structure of software can become the structure of collaboration: types describe the work, module requirements expose what is missing, and composition turns independent contributions into a running system.
-
-A [recorded working example](docs/live-composition-validation.json) gives one real
-coding agent six published component cards. It writes a
-[TOML knowledge system](examples/modules/agent-authored-knowledge.toml), using
-existing Python implementations, which passes evaluation and is selected by the
-build system. This demonstrates the central loop; million-agent operation remains
-the scaling target.
 
 ## The problem: building a knowledge base together
 
@@ -27,7 +20,7 @@ Consider an enterprise knowledge base answering questions across product manuals
 
 There may be thousands of useful algorithms within each category. A team working on legal documents may contribute a different chunker; another may contribute a multilingual ranker; another may adapt an existing database. A single owner should not have to maintain all of these implementations. Nor should every improvement require editing one enormous application or publishing its entire dependency ecosystem again.
 
-Suppose one agent improves query embedding while another rebuilds the index. Both implementations return arrays of the expected length, and both pass their own API tests. The combined system can still produce meaningless retrieval if the arrays belong to different embedding spaces. This is a practical constraint: Azure AI Search's vector-query guidance calls for using the same embedding model for queries and indexed documents. [Vector query documentation](https://learn.microsoft.com/en-us/azure/search/vector-search-how-to-query).
+Suppose one contributor improves query embedding while another rebuilds the index. Both implementations return arrays of the expected length, and both pass their own API tests. The combined system can still produce meaningless retrieval if the arrays belong to different embedding spaces. This is a practical constraint: Azure AI Search's vector-query guidance calls for using the same embedding model for queries and indexed documents. [Vector query documentation](https://learn.microsoft.com/en-us/azure/search/vector-search-how-to-query).
 
 Or suppose ingestion and retrieval both require a document store. Choosing the same database library twice does not mean they see the same store instance. With two in-memory stores, ingestion succeeds and retrieval sees nothing.
 
@@ -54,7 +47,7 @@ These shapes do not answer:
 | Can the composition reuse a committed transaction? | A callable signature alone does not describe resource consumption. | Ownership modes and checked operation sequences. |
 | Does this composition fit the allowed effects? | A compatible function may still declare network or storage effects. | Declared operation effects and composition bounds. |
 
-API specifications can be extended to encode some of this. The important step is giving those declarations composition rules and a checker that uses them. Otherwise they remain prose obligations that every agent must rediscover and reconcile.
+API specifications can be extended to encode some of this. The important step is giving those declarations composition rules and a checker that uses them. Otherwise they remain prose obligations that every contributor must rediscover and reconcile.
 
 APIs still connect the running system to users and external services. Module contracts describe how to construct that system. An adapter for a remote API can itself be a module with explicit dependencies, types, and effects.
 
@@ -82,15 +75,15 @@ A useful system contract expresses several kinds of agreement:
 | Shared instance | `retrieval.data = harness.data` | Both slots are wired to the same named graph node or port. |
 | Usage and effects | Borrow a session, then move it into commit. | The checked language accounts for ownership and declared operation effects. |
 
-Types also make the search space intelligible. An agent looking for a reranker should see candidates that accept its document type and preserve the identities needed for citations. An integration agent should reject an incompatible embedding space before spending time evaluating retrieval quality. Types establish which compositions make sense; evaluations distinguish the useful ones.
+Types also make the search space intelligible. A developer looking for a reranker should see candidates that accept its document type and preserve the identities needed for citations. An integrator should reject an incompatible embedding space before spending time evaluating retrieval quality. Types establish which compositions make sense; evaluations distinguish the useful ones.
 
 The longer-term direction is to publish reusable vocabularies of documents, chunks, citations, model capabilities, resource protocols, and permitted effects. A contributor can then improve one operation while preserving the relationships the rest of the system depends on.
 
-## Designing for millions of agents on one project
+## Scaling independent contributions
 
 The scaling principle is **bounded local knowledge and hierarchical composition**. A project can have a very large contribution ecosystem while each task and each executable uses a much smaller slice of it.
 
-A ranking contributor should need the ranking contract, relevant shared types, permitted dependencies, and an evaluation task. It should not need the implementation of the billing service, every document connector, or every competing ranker. An integration agent should be able to select a published retrieval subsystem without reopening all of its internal decisions.
+A ranking contributor should need the ranking contract, relevant shared types, permitted dependencies, and an evaluation task. It should not need the implementation of the billing service, every document connector, or every competing ranker. An integrator should be able to select a published retrieval subsystem without reopening all of its internal decisions.
 
 The intended contribution loop is:
 
@@ -101,7 +94,7 @@ The intended contribution loop is:
 5. Compose validated contributions into a subsystem and publish that subsystem with any remaining requirements.
 6. Select and lock a complete composition for a particular application or experiment.
 
-Imagine a million-agent effort organized around a shared knowledge platform. Some groups improve ingestion for particular document formats. Others explore ranking algorithms, storage backends, model harnesses, or evaluation methods. Within each group, agents work against smaller contracts. Successful compositions become reusable subsystems, which become inputs to the next level of composition.
+Imagine a large collaborative effort organized around a shared knowledge platform. Some groups improve ingestion for particular document formats. Others explore ranking algorithms, storage backends, model harnesses, or evaluation methods. Within each group, contributors work against smaller contracts. Successful compositions become reusable subsystems, which become inputs to the next level of composition.
 
 The project is shared through its contracts and contribution graph. Agents do not all need to edit the same checkout or attend to the same global stream of changes. A subsystem becomes another module: its consumer sees the exported contract and remaining requirements, while the exact implementation closure stays available for building and audit.
 
@@ -113,7 +106,7 @@ Several design choices support this direction:
 | --- | --- |
 | Everyone edits a global inventory. | Discover source locally and publish independent contribution manifests. |
 | One family owner becomes the ecosystem's bottleneck. | Let independent publishers contribute implementations and new dependencies. |
-| Every agent needs the entire source tree. | Give each task the relevant signatures, shared types, and open requirements. |
+| Every contributor needs the entire source tree. | Give each task the relevant signatures, shared types, and open requirements. |
 | Every consumer must inspect every algorithm. | Discover by contract and capability; reuse composed subsystems as selection units. |
 | A new provider changes everyone's application. | Publish immutable versions and lock each selected program. |
 | Every algorithm ships its whole library. | Build only the selected members and their reachable implementation dependencies. |
@@ -130,7 +123,7 @@ A publisher owns its contributions, not the entire family. Two independent publi
 
 For example, a ranking family can contain `alice.temporal_decay` and `bob.diversity_ranker`. Alice does not need to acquire Bob's code or republish it. A third publisher can contribute a constructor that combines suitable ranking components.
 
-Families also provide context for discovery, while individual members declare capabilities and requirements. The larger repository should connect these declarations to evaluations and provenance, so agents can discover both what fits and what has worked for comparable problems.
+Families also provide context for discovery, while individual members declare capabilities and requirements. The larger repository should connect these declarations to evaluations and provenance, so consumers can discover both what fits and what has worked for comparable problems.
 
 ## Three authoring layers, ordinary Python execution
 
@@ -299,7 +292,7 @@ Run it after installing the project below. The checker also substitutes associat
 
 ## Close the contribution loop
 
-The contribution protocol makes the coordination model executable. A missing provider becomes a contribution draft; an integrator adds acceptance cases; a contributor builds a candidate in a staging repository; evaluation binds observations to the exact program and environment; an explicit acceptance command publishes the tested contribution.
+The contribution protocol checks independently submitted implementations against explicit acceptance cases. A missing provider becomes a contribution draft; an integrator adds acceptance cases; a contributor builds a candidate in a staging repository; evaluation binds observations to the exact program and environment; an explicit acceptance command publishes the tested contribution.
 
 ```bash
 .venv/bin/python examples/contribution_system.py --work-dir .mf/contribution-demo
@@ -310,77 +303,6 @@ Run this after installing the project as shown below. The example composes the e
 The task is a small TOML contract with an exact interface, declared capability/effect requirements, and explicit input/output cases. It is prepared before a complete system provider exists. Each case runs in a fresh locked worker process with a timeout. Evidence records the task, program, environment, and observations. The integrated evaluator signs its own passing observations; evidence-aware synthesis then requires a trusted observation for the exact selected composition and executable environment.
 
 See the [contribution workflow](docs/contributions.md) for the contract grammar, CLI commands, evidence semantics, and working example. The [module calculus design](docs/module-calculus.md) distinguishes implemented associated-type rules from remaining language research.
-
-## From a missing contract to agent-authored software
-
-An agent worker receives a small immutable task packet: the required signature,
-capabilities, effect policy, and acceptance cases. An operator-configured coding
-agent writes ordinary Python and a TOML manifest. The worker builds the artifact
-and publishes it to staging. A separately authorized evaluator resolves its
-accepted dependencies, builds a locked environment, runs the cases, signs passing
-observations, and admits the exact contribution to the repository.
-
-For a knowledge-ingestion team, the packet might ask for document chunking that
-preserves source identity. It need not include the search service, the billing
-service, or a checkout of every competing algorithm. The same protocol accepts
-an open graph or checked `.mfl` program, so an integration agent can contribute a
-composition rather than another implementation of its dependencies.
-
-```bash
-# Uses your authenticated local Codex CLI to compose existing providers in TOML.
-.venv/bin/python examples/agent_composition.py --work-dir .mf/agent-composition
-
-# Smaller task: adapt standard-library textwrap while preserving document IDs.
-.venv/bin/python examples/agent_contribution.py --work-dir .mf/agent-demo
-```
-
-The composition example supplies a bounded set of published contracts and cards.
-The agent writes the module graph; Mari ranking, scikit-learn embeddings, SQLite
-storage, and the query harness remain existing Python implementations. Evaluation
-checks the resulting knowledge system before publication.
-
-The [recorded repair run](docs/live-repair-validation.json) starts with an
-incorrect chunker. Evaluation rejects it; a real agent reads the failure feedback
-and publishes a corrected version. Rejected and repaired artifacts retain distinct
-immutable identities, and only the passing repair reaches the accepted repository.
-
-The [campaign coordinator](docs/campaigns.md) accepts a TOML task DAG and a final
-system goal. Tasks become eligible after their prerequisites are accepted; each
-agent has bounded attempts, leases, and evaluation feedback. The coordinator
-repeats contribution and evaluation rounds, then synthesizes and locks a unique
-complete system. Acceptance cases are supplied contracts, not tests invented by
-candidate code to approve itself.
-
-A goal can require evidence as well as types:
-
-```toml
-[goal]
-name = "source-preserving-ingestion"
-requires = { id = "knowledge.chunker", version = "1" }
-capabilities = ["source-preserving-chunking"]
-
-[evidence]
-tasks = ["<sha256 of the prepared acceptance contract>"]
-evaluators = ["knowledge-ci"]
-```
-
-The [evidence guide](docs/evidence-selection.md) explains how observations bind
-to a whole composition, including its supplied dependencies. Changing a vector
-provider, Python wheel, interpreter, or runtime can require reevaluation. Attestations support Ed25519 public evaluator identities and HMAC within an
-operator trust domain. Consumers configure trusted public keys explicitly. Finite passing cases establish those observations,
-not a proof of arbitrary Python behavior.
-
-The durable queue supports remote authenticated workers, atomic claims, lease
-renewal, stale-worker fencing, immutable prerequisite DAGs, and crash recovery.
-A million task records have been exercised with eight real worker processes.
-Separately, [million-row discovery measurements](docs/candidate-paging.md) show
-that requesting one candidate decodes one card. Synthesis detects publication
-changes during its search and requires a retry rather than silently claiming a
-complete selection from changing pages.
-See the [coordination measurements](docs/coordination-scale.md) for throughput,
-resource use, and the distinction between records and active agents. A Python
-virtual environment isolates dependencies; untrusted candidate execution still
-requires an operator-provided OS sandbox.
 
 ## Run the examples
 
@@ -531,13 +453,12 @@ Repository discovery uses SQLite/FTS5 metadata and a content-addressed artifact 
 
 The project draws on ML signatures, functors, abstract types, and sharing; module families and mixin composition; and separate checking above an existing implementation language. [Backpack](https://people.mpi-sws.org/~dreyer/papers/backpack/paper.pdf) is an important precedent for the latter. [Linear Haskell](https://arxiv.org/abs/1710.09756) informs the interest in combining unrestricted values with ownership-sensitive composition. This implementation uses a smaller calculus and does not inherit those systems' soundness results.
 
-The research direction is a software ecosystem where an agent can begin with a desired system, find its missing contracts, delegate those contracts to other agents, and assemble the resulting contributions. Richer module types, reusable protocols, evaluation-backed selection, and distributed publication are the foundations for that ecosystem.
+The research direction is a module language that expresses larger programs through typed composition, shared dependencies, mixins, and reusable protocols. People and external tools can consume these contracts; this project does not execute coding agents or orchestrate their work.
 
-The implementation includes the build and repository core, open module composition, associated-type substitution in graphs and checked operations, bounded constructor synthesis, ownership/effect checks, durable remote worker coordination, staged contributions, and authenticated evidence-aware selection. Local repository and queue services use SQLite; federated discovery combines independent repositories through bounded queries. Operation with millions of simultaneously active agents remains unmeasured. Python providers remain trusted. Full generative module typing, arbitrary program synthesis, and automatic lifecycle reasoning remain research work.
+The implementation includes the build and repository core, open module composition, associated-type substitution in graphs and checked operations, bounded constructor synthesis, ownership/effect checks, staged contributions, and authenticated evidence-aware selection. Local repository services use SQLite; federated discovery combines independent repositories through bounded queries. Python providers remain trusted. Full generative module typing, arbitrary program synthesis, and automatic lifecycle reasoning remain research work.
 
-Local scale measurements include 10,000 definitions across 1,000 contribution files with a 21-line root TOML, and a copied Mari workload with 988 public definitions. These measure compact authoring and selective builds, rather than concurrent agent capacity.
+Local scale measurements include 10,000 definitions across 1,000 contribution files with a 21-line root TOML, and a copied Mari workload with 988 public definitions. These measure compact authoring and selective builds, rather than concurrent contributor capacity.
 
-The 0.7.0 validation includes the agent-authored knowledge graph, generic checked operations, contribution campaigns, federated discovery, and authenticated evaluation. Exact test counts, wheel checks, and measured scopes are recorded in the current validation report. Historical 0.5.0 and 0.4.0 reports retain the contribution-loop and SQLite evidence. Historical reports cover the composed knowledge system, copied Mari migration, and local source-scale workloads. These are separate measurements with their scopes recorded in [validation](docs/VALIDATION.md).
 
 ```bash
 .venv/bin/pytest -q
@@ -559,8 +480,6 @@ The 0.7.0 validation includes the agent-authored knowledge graph, generic checke
 | [Synthesis guide](docs/synthesis.md) | Constructor search, ambiguity, policies, and program locks. |
 | [Repository guide](docs/repository.md) | Publication, authentication, and artifact retrieval. |
 | [Federation](docs/federation.md) | Independent repository shards, bounded discovery, and immutable identity conflicts. |
-| [Campaigns](docs/campaigns.md) | TOML task DAGs, agent workers, evaluation feedback, and final synthesis. |
 | [Evidence selection](docs/evidence-selection.md) | Exact-composition observations and trusted public evaluator identities. |
-| [Coordination measurements](docs/coordination-scale.md) | Million-record workloads, active worker counts, and readiness indexing. |
 
 Licensed under [Apache-2.0](LICENSE).

@@ -1,82 +1,22 @@
 {
-  "date": "2026-09-08",
-  "version": "0.7.0",
-  "python": "3.14.6",
+  "scope": "Module language and Python build system after removal of coding-agent orchestration",
   "tests": {
-    "passed": 747,
+    "passed": 680,
     "subtests_passed": 32,
-    "seconds": 67.39,
-    "command": ".venv/bin/pytest -q --tb=short"
+    "command": ".venv/bin/python -m pytest tests -q"
   },
-  "ruff": "passed: src tests scripts examples adaptations/associated adaptations/knowledge adaptations/transactions",
-  "release_wheel": {
-    "path": "dist/module-families/module_families-0.7.0-py3-none-any.whl",
-    "sha256": "22efe791d696e46000638ced3781cc47d2b934776c7da864e176ce0ed535b0b5",
-    "built": true
+  "lint": "passed",
+  "wheel": {
+    "build": "passed with isolated build dependencies",
+    "removed_modules_absent": [
+      "automation_cli",
+      "campaigns",
+      "coordination",
+      "migration",
+      "worker_context",
+      "workers"
+    ],
+    "model_credential_forwarding_absent": true
   },
-  "agent_composition": {
-    "live_authoring": "live-composition-validation.json",
-    "release_replay": "agent-composition-release-validation.json",
-    "actual_agent_invocations": 1,
-    "candidate_cards": 6,
-    "new_python_implementation": false,
-    "evaluation_cases": 3,
-    "synthesis_status": "unique",
-    "public_key_verified_release_replay": true,
-    "offline_first_hits": [
-      "docs:dogs",
-      "docs:python"
-    ]
-  },
-  "generic_mfl": {
-    "separate_compilation_without_providers": true,
-    "checked_sha256": "8120a0ebfdd058a44bb53cbb7b0cf929eb5a92cb4320f87a3d0dbfd967e130ba",
-    "explicit_sharing_checked": true,
-    "nested_owned_returns_tested": true,
-    "sqlite_fts5_result": [
-      {
-        "document_id": "retention-2026",
-        "title": "Data retention",
-        "page": 3,
-        "text": "Customer records must follow the data retention schedule."
-      }
-    ]
-  },
-  "coordination": {
-    "report": "coordination-scale-validation.json",
-    "task_records": 1000000,
-    "worker_processes": 8,
-    "accepted_synthetic_workflows": 16000,
-    "claim_readiness_index": true
-  },
-  "integration": {
-    "toml_campaigns": true,
-    "bounded_worker_contract_context": true,
-    "evaluation_retry_feedback": true,
-    "staged_dependency_exclusion": true,
-    "durable_admission_receipt_recovery": true,
-    "ed25519_public_evaluator_identity": true,
-    "evidence_binds_exact_composition_and_environment": true,
-    "cross_repository_synthesis_and_execution": true,
-    "credential_environment_isolation": true,
-    "copied_mari_original_worktree_clean": true
-  },
-  "previous_measurements": "final-validation-0.6.json",
-  "limits": [
-    "One real composition task is not a comparative agent-quality benchmark.",
-    "Million task records do not measure a million active agents; no model or evaluation cost is included in synthetic queue throughput.",
-    "Declared associated witnesses and ordinary Python bodies remain trusted; no metatheoretic soundness proof or fresh generative identities.",
-    "Clean candidate environments are not an OS sandbox; untrusted code requires operator-provided isolation.",
-    "Repository federation is bounded read federation, without distributed snapshots or consensus.",
-    "Evidence authenticates finite observations and configured evaluator identities, not universal behavior or the best possible solution.",
-    "Publication revision checks are optimistic: continuous writes can force retries; retained catalog snapshots are not implemented."
-  ],
-  "prior_release_report": "final-validation-0.7.json",
-  "post_release_fixes": {
-    "repair": "live-repair-validation.json",
-    "bounded_candidate_paging": "candidate-paging-validation.json",
-    "concurrent_publication_guard": true,
-    "exact_root_avoids_domain_enumeration": true,
-    "historical_examples": "Earlier agent/model and offline replay records retain their original measured environments; new tests cover the changed query path."
-  }
+  "mari_adaptation": "Test fixture only: tests/mari_fixture.py; no package migration module or command"
 }

@@ -43,6 +43,28 @@ def _emit(value, destination: str | None = None):
         print(text, end="")
 
 
+def trust_keys(environment="MF_EVIDENCE_KEYS"):
+    from .signing import PublicEvaluatorKey
+
+    value = json.loads(os.environ.get(environment, "{}"))
+    if not isinstance(value, dict):
+        raise ValueError("evidence keys must map evaluator IDs to keys")
+    result = {}
+    for name, key in value.items():
+        if not isinstance(name, str):
+            raise ValueError("evaluator IDs must be strings")
+        if isinstance(key, str):
+            result[name] = key.encode()
+        elif isinstance(key, dict) and set(key) == {"ed25519"}:
+            try:
+                result[name] = PublicEvaluatorKey(bytes.fromhex(key["ed25519"]))
+            except (ValueError, TypeError) as error:
+                raise ValueError("invalid evaluator public key") from error
+        else:
+            raise ValueError("key must be a secret string or {ed25519: public hex}")
+    return result
+
+
 def _effects(args):
     return [] if args.pure else args.allow_effect
 
@@ -71,12 +93,6 @@ def parser() -> argparse.ArgumentParser:
     scaffold.add_argument("manifest")
     scaffold.add_argument("--member", required=True)
     scaffold.add_argument("--out")
-    migrate = sub.add_parser(
-        "migrate-mari",
-        help="Generate family metadata from a copied Mari source tree without importing it",
-    )
-    migrate.add_argument("project", nargs="?", default="projects/mari-kit")
-    migrate.add_argument("--out", default="families/mari/family.toml")
     catalog = sub.add_parser("catalog", help="Search an unpublished family manifest")
     catalog.add_argument("manifest")
     catalog.add_argument("query", nargs="?", default="")
@@ -338,19 +354,12 @@ def parser() -> argparse.ArgumentParser:
             action="append",
             help="Allowed declared effect; repeat as needed",
         )
-    from .automation_cli import register
-
-    register(sub)
     return root
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
-        from .automation_cli import COMMANDS, run, trust_keys
-
-        if args.command in COMMANDS:
-            return run(args, _emit)
         if args.command == "init":
             from .authoring import draft_family
 
@@ -364,10 +373,6 @@ def main(argv: list[str] | None = None) -> int:
                     version=args.family_version,
                 )
             )
-        elif args.command == "migrate-mari":
-            from .migration import generate_mari
-
-            _emit(generate_mari(args.project, args.out))
         elif args.command == "scaffold":
             from .authoring import scaffold_member
 

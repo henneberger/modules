@@ -2,9 +2,9 @@ import copy
 from pathlib import Path
 
 import pytest
+from mari_fixture import generate_mari
 
 from module_families.catalog import Catalog, ManifestError
-from module_families.migration import generate_mari
 
 ROOT = Path(__file__).resolve().parents[1]
 

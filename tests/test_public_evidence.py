@@ -6,14 +6,10 @@ import hmac
 import pytest
 from test_evidence import TASK, attestation
 from test_evidence import assembly as assembly
-from test_workers import run
-from test_workers import setup as setup
-from test_workers import wheelhouse as wheelhouse
 
 from module_families import evidence as e
 from module_families.registry import canonical_bytes
 from module_families.signing import PrivateEvaluatorKey
-from module_families.workers import evaluate_submission
 
 pytest.importorskip("cryptography")
 
@@ -58,29 +54,6 @@ def test_public_key_cannot_be_used_as_hmac_secret(assembly):
         e.verify_attestation(
             signed(assembly, private), {"ci": private.public_key().raw}
         )
-
-
-def test_integrated_evaluator_uses_private_key_and_publishes_public_receipt(
-    setup, wheelhouse
-):
-    root, base, staging, queue, task = setup
-    run(setup)
-    private = PrivateEvaluatorKey.generate()
-    store = e.EvidenceStore(root / "signed.sqlite")
-    kwargs = dict(
-        work_root=root / "evaluations",
-        evidence_store=store,
-        evaluator_id="ci",
-        secret=private,
-        find_links=[str(wheelhouse)],
-        no_index=True,
-    )
-    accepted = evaluate_submission(queue, task["id"], base, staging, **kwargs)
-    record = accepted["attestation"]
-    assert record["payload"]["format"] == "module-families-ed25519-attestation-1"
-    e.verify_attestation(record, {"ci": private.public_key()})
-    assert private.raw.hex() not in str(accepted)
-    assert evaluate_submission(queue, task["id"], base, staging, **kwargs) == accepted
 
 
 @pytest.mark.parametrize(
@@ -141,7 +114,7 @@ def test_evaluator_identity_is_signed(assembly):
 def test_cli_public_key_parser_preserves_protocol(monkeypatch, assembly):
     import json
 
-    from module_families.automation_cli import _evaluator_secret, trust_keys
+    from module_families.cli import trust_keys
     from module_families.signing import PublicEvaluatorKey
 
     private = PrivateEvaluatorKey.generate()
@@ -152,8 +125,6 @@ def test_cli_public_key_parser_preserves_protocol(monkeypatch, assembly):
     keys = trust_keys("TEST_EVIDENCE_KEYS")
     assert isinstance(keys["ci"], PublicEvaluatorKey)
     e.verify_attestation(signed(assembly, private), keys)
-    monkeypatch.setenv("TEST_SIGNER", "ed25519:" + private.raw.hex())
-    assert _evaluator_secret("TEST_SIGNER") == private
     for bad in [
         {"ci": {"ed25519": "not-hex"}},
         {"ci": {"ed25519": "ab" * 31}},
@@ -163,10 +134,6 @@ def test_cli_public_key_parser_preserves_protocol(monkeypatch, assembly):
         monkeypatch.setenv("TEST_EVIDENCE_KEYS", json.dumps(bad))
         with pytest.raises(ValueError):
             trust_keys("TEST_EVIDENCE_KEYS")
-    for bad in ["ed25519:", "ed25519:" + "ab" * 31, "ed25519:not-hex"]:
-        monkeypatch.setenv("TEST_SIGNER", bad)
-        with pytest.raises(ValueError, match="private key"):
-            _evaluator_secret("TEST_SIGNER")
 
 
 def test_missing_crypto_extra_has_actionable_diagnostic(monkeypatch):
@@ -184,32 +151,3 @@ def test_missing_crypto_extra_has_actionable_diagnostic(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", without_crypto)
     with pytest.raises(ValueError, match=r"module-families\[signing\]"):
         PublicEvaluatorKey(b"x" * 32).verify(b"x" * 64, b"message")
-
-
-def test_candidate_evaluation_cannot_read_inherited_signing_environment(
-    setup, wheelhouse, monkeypatch
-):
-    from test_workers import driver
-
-    root, base, staging, queue, task = setup
-    command = driver(root)
-    source = root / "driver.py"
-    old = "def run(value): return value + 1"
-    candidate = "def run(value):\n    import os\n    assert 'MF_EVALUATOR_SECRET' not in os.environ\n    assert 'CUSTOM_EVALUATOR_KEY' not in os.environ\n    return value + 1\n"
-    source.write_text(source.read_text().replace(repr(old), repr(candidate)))
-    monkeypatch.setenv("MF_EVALUATOR_SECRET", "signing-seed-kept-in-parent")
-    monkeypatch.setenv("CUSTOM_EVALUATOR_KEY", "custom-signing-seed-kept-in-parent")
-    run(setup, command)
-    result = evaluate_submission(
-        queue,
-        task["id"],
-        base,
-        staging,
-        work_root=root / "evaluation",
-        evidence_store=e.EvidenceStore(root / "evidence.sqlite"),
-        evaluator_id="ci",
-        secret=PrivateEvaluatorKey.generate(),
-        find_links=[str(wheelhouse)],
-        no_index=True,
-    )
-    assert result["status"] == "accepted"

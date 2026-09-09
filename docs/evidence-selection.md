@@ -168,11 +168,8 @@ attestation = ingest_evidence(
 verify_attestation(attestation, {"knowledge-ci": public})
 ```
 
-The integrated `evaluate_submission(..., secret=private)` path performs the
-same signing after its own evaluation. On the CLI, the evaluator secret variable
-accepts `ed25519:<32-byte-private-key-in-hex>`. Consumer `MF_EVIDENCE_KEYS` accepts
+Consumer `MF_EVIDENCE_KEYS` accepts
 `{"knowledge-ci":{"ed25519":"<32-byte-public-key-in-hex>"}}`.
-Never distribute the evaluator secret environment to candidate processes.
 
 The signed format identifies Ed25519 separately from HMAC. Verification rejects
 algorithm/key-kind mismatches, including attempts to treat a public key as an

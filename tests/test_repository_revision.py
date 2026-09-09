@@ -14,7 +14,6 @@ from module_families.handoffs import plan_contributions
 from module_families.registry import Registry, RegistryError
 from module_families.repository import RemoteRegistry, make_server
 from module_families.synthesis import synthesize
-from module_families.workers import OverlayRepository
 
 
 def test_publication_revision_is_idempotent(tmp_path, repo):
@@ -26,11 +25,10 @@ def test_publication_revision_is_idempotent(tmp_path, repo):
     assert repo.revision()["publication_sha256"] != before["publication_sha256"]
 
 
-@pytest.mark.parametrize("view", ["local", "federated", "overlay"])
+@pytest.mark.parametrize("view", ["local", "federated"])
 def test_publication_during_search_requires_retry(tmp_path, repo, monkeypatch, view):
     publish(tmp_path, repo, "alpha", [provider()], "def run(value): return value")
-    catalog = (repo if view == "local" else FederatedRegistry({"a": repo})
-               if view == "federated" else OverlayRepository(repo))
+    catalog = repo if view == "local" else FederatedRegistry({"a": repo})
     query = repo.candidates
     changed = False
 
