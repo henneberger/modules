@@ -1,0 +1,13 @@
+from contracts import Search
+from components import SQLitePhraseParser, SQLiteIndex
+from cached_search import CachedSearch
+
+module CompanyKnowledge -> Search:
+    parser = SQLitePhraseParser()
+    index = SQLiteIndex()
+    system = CachedSearch(parser=parser, index=index)
+
+    effects sqlite, memory
+
+    export system.search
+    export type DocumentId = system.DocumentId

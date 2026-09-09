@@ -1,3 +1,15 @@
-prepared = prepare.prepare(query)
-results = index.search(prepared)
-return results
+from contracts import QueryParser, SearchIndex, Search
+
+module KnowledgeSearch -> Search:
+    requires parser: QueryParser
+    requires index: SearchIndex
+
+    sharing parser.QuerySyntax = index.QuerySyntax
+    effects sqlite
+
+    export type DocumentId = index.DocumentId
+
+    export def search(query: str):
+        prepared = parser.prepare(query)
+        results = index.search(prepared)
+        return results

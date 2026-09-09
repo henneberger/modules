@@ -1,0 +1,3 @@
+signature QueryParser = "kb.generic.query@1"
+signature SearchIndex = "kb.generic.index@1"
+signature Search = "kb.generic.search@1"

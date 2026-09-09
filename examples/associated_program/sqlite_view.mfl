@@ -1,0 +1,18 @@
+from contracts import SearchIndex, Search
+from components import SQLitePhraseParser
+from search import KnowledgeSearch
+
+module SQLitePhraseSearch -> Search:
+    requires index: SearchIndex
+
+    parser = SQLitePhraseParser()
+
+    view phrase_index = index -> SearchIndex:
+        where type QuerySyntax = parser.QuerySyntax
+
+    system = KnowledgeSearch(parser=parser, index=phrase_index)
+
+    effects sqlite
+
+    export system.search
+    export type DocumentId = system.DocumentId

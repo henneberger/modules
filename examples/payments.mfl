@@ -1,0 +1,12 @@
+signature PaymentProcessor:
+    type Money
+    type Receipt
+
+    def charge(amount: Money, *, idempotency_key: str) -> Receipt
+
+module Checkout -> PaymentProcessor:
+    requires processor: PaymentProcessor
+
+    export processor.charge
+    export type Money = processor.Money
+    export type Receipt = processor.Receipt

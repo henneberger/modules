@@ -1,4 +1,12 @@
-with resource(store.begin(), success=store.commit, failure=store.abort) as session:
-    store.put(session, key, value)
-    observed = store.read(session, key)
-    return observed
+from contracts import TransactionStore, WriteRead
+
+module WriteAndRead -> WriteRead:
+    requires store: TransactionStore
+
+    effects sqlite
+
+    export def run(key: str, value: str) -> str:
+        with resource(store.begin(), success=store.commit, failure=store.abort) as session:
+            store.put(session, key, value)
+            observed = store.read(session, key)
+            return observed

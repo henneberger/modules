@@ -1,0 +1,3 @@
+component SQLitePhraseParser = "typed-knowledge/sqlite.phrase"
+component SQLiteIndex = "typed-knowledge/sqlite.fts"
+component MemoizeQuery = "typed-knowledge/stdlib.cached_query"

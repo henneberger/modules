@@ -1,0 +1,16 @@
+from contracts import QueryParser, SearchIndex, Search
+from components import MemoizeQuery
+from search import KnowledgeSearch
+
+module CachedSearch -> Search:
+    requires parser: QueryParser
+    requires index: SearchIndex
+
+    sharing parser.QuerySyntax = index.QuerySyntax
+    effects sqlite, memory
+
+    cached = MemoizeQuery(base=parser)
+    system = KnowledgeSearch(parser=cached, index=index)
+
+    export system.search
+    export type DocumentId = system.DocumentId
