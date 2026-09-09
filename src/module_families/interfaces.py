@@ -247,8 +247,6 @@ def _typing(spec: dict, signature: Signature, associated: dict | None = None) ->
         value = _shape(
             operations[name], {"parameters", "returns", "effects"}, f"typing.operations.{name}"
         )
-        if callable_spec.asynchronous:
-            raise InterfaceError(f"typed operation {name} must be synchronous")
         parameters = value.get("parameters")
         shape = callable_spec.signature.parameters
         if not isinstance(parameters, dict) or set(parameters) != set(shape):

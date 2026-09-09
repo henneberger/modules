@@ -81,6 +81,7 @@ def read_module(source):
             "ports",
             "nodes",
             "links",
+            "views",
             "exports",
             "indices",
             "associated",
@@ -114,6 +115,7 @@ def read_module(source):
         "nodes",
         "links",
         "exports",
+        "views",
         "indices",
         "associated",
         "instance_exports",
@@ -157,6 +159,8 @@ def read_module(source):
                 "expression": {"use": name},
             }
         )
+    if set(doc["views"]) - set(doc["links"]):
+        raise ModuleBuildError("signature views must name declared dependency links")
     for target, provider in doc["links"].items():
         _path(target, doc["nodes"])
         if not isinstance(provider, str) or provider not in names:
@@ -289,8 +293,13 @@ def _check_graph(doc, cards, repository):
         )
     for target, provider in doc["links"].items():
         alias, slot = target.split(".")
-        if cards[alias]["requires"][slot] != references[provider]:
-            raise ModuleBuildError(f"contract mismatch: {target} <- {provider}")
+        expected = cards[alias]["requires"][slot]
+        if target in doc["views"]:
+            from .refinement import refine_signature
+
+            refine_signature(signatures[provider], specs[(expected["id"], expected["version"])], doc["views"][target])
+        elif expected != references[provider]:
+            raise ModuleBuildError(f"contract mismatch: {target} <- {provider}; declare a signature view")
     from .module_ir import ModuleIRError, lower_graph
 
     try:
@@ -328,10 +337,14 @@ def _check_graph(doc, cards, repository):
         if name in result["types"]:
             if export not in signatures[owner]["types"]:
                 raise ModuleBuildError(f"missing type export: {path}")
-        elif signatures[owner]["callables"].get(export) != result["callables"][name]:
-            raise ModuleBuildError(
-                f"export call contract mismatch: {name} <- {path}; use an explicit adapter"
-            )
+        else:
+            from .contracts import _check_call_acceptance
+
+            source_call = signature_from_spec(signatures[owner]).callables.get(export)
+            target_call = signature_from_spec(result).callables[name]
+            if source_call is None or source_call.asynchronous != target_call.asynchronous:
+                raise ModuleBuildError(f"export operation kind mismatch: {name} <- {path}")
+            _check_call_acceptance(target_call.signature, source_call.signature, name)
     from .instance_terms import validate_instance_interface
 
     for alias, card in cards.items():
@@ -341,6 +354,10 @@ def _check_graph(doc, cards, repository):
     validate_instance_interface({"requires": doc["ports"], **instances}, result, {
         name: signatures[name] for name in doc["ports"]
     })
+    from .mixins import validate_mixin_interfaces
+
+    for card in cards.values():
+        validate_mixin_interfaces(card, specs)
     associated = graph_associated(doc, cards, order, specs)
     # Every selected node/port must contribute to the public dependency graph.
     used = {path.split(".")[0] for path in doc["exports"].values()}
@@ -598,6 +615,8 @@ def build_module(
                 "module_runtime.py",
                 "module_ir.py",
                 "instance_terms.py",
+                "refinement.py",
+                "mixins.py",
                 "indices.py",
                 "contracts.py",
                 "interfaces.py",

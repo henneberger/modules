@@ -75,6 +75,9 @@ def _references(member: dict, identifier: str) -> None:
         validate_indices(member)
         validate_associated(member)
         validate_instances(member)
+        from .mixins import validate_mixin
+
+        validate_mixin(member)
     except ValueError as error:
         raise ManifestError(f"{identifier}: {error}") from error
     try:

@@ -114,7 +114,9 @@ def graph_instances(doc, cards, order):
 
         def dependency(path, alias=alias):
             slot, separator, role = path.partition(".")
-            target = doc["links"][alias + "." + slot]
+            edge = alias + "." + slot
+            target = doc["links"][edge]
+            role = doc.get("views", {}).get(edge, {}).get("instances", {}).get(role, role)
             return target + ("." + role if separator else "")
 
         for left, right in card.get("instance_sharing", []):

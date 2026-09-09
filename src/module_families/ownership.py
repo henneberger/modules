@@ -186,6 +186,10 @@ def _invoke_checked(function, arguments, parameter_specs, returns):
     # Generated entry code performs the input transfer. Unboxing here would
     # consume the caller's handles twice and break nested checked composition.
     values = _return_values(function(*arguments), returns)
+    return _checked_returns(values, returns)
+
+
+def _checked_returns(values, returns):
     handles = {id(value): value for value in values if isinstance(value, Owned)}
     with ExitStack() as stack:
         for identity in sorted(handles):
@@ -280,3 +284,142 @@ def invoke(
 
 def _release_borrow(handle: Owned) -> None:
     handle._borrows -= 1
+
+
+class ResourceScope:
+    def __init__(self, handle, success, failure, success_parameters, failure_parameters):
+        if not isinstance(handle, Owned):
+            raise OwnershipError("resource scopes require an owned handle")
+        for function, parameters in ((success, success_parameters), (failure, failure_parameters)):
+            if not callable(function) or len(parameters) != 1:
+                raise OwnershipError("resource cleanup requires a unary operation")
+            _spec(parameters[0], parameter=True)
+            if parameters[0]["mode"] != "move" or parameters[0]["id"] != handle.type_id or parameters[0]["usage"] != handle.usage:
+                raise OwnershipError("resource cleanup must consume the acquired owner")
+        self.handle = handle
+        self.success = success
+        self.failure = failure
+        self.success_parameters = success_parameters
+        self.failure_parameters = failure_parameters
+        self.closed = False
+
+    def __enter__(self):
+        with self.handle._lock:
+            _live(self.handle)
+            if self.handle._borrows:
+                raise OwnershipError("cannot enter a resource scope with active borrows")
+        return self.handle
+
+    def complete(self):
+        if not self.closed:
+            self.closed = True
+            invoke(self.success, [self.handle], self.success_parameters, [])
+
+    def __exit__(self, exception_type, exception, traceback):
+        if not self.closed:
+            if exception_type is None:
+                self.complete()
+            else:
+                self.closed = True
+                invoke(self.failure, [self.handle], self.failure_parameters, [])
+        return False
+
+
+async def invoke_async(function, arguments, parameter_specs, returns):
+    import inspect
+
+    if len(arguments) != len(parameter_specs):
+        raise OwnershipError("argument arity does not match parameter contract")
+    for spec in parameter_specs:
+        _spec(spec, parameter=True)
+    for spec in returns:
+        _spec(spec, parameter=False)
+    if hasattr(function, _CHECKED_SIGNATURE):
+        if getattr(function, _CHECKED_SIGNATURE) != _signature(parameter_specs, returns):
+            raise OwnershipError("checked asynchronous signature mismatch")
+        values = _return_values(await function(*arguments), returns)
+        return _checked_returns(values, returns)
+    handles = {id(value): value for value in arguments if isinstance(value, Owned)}
+    borrowed = []
+    raw, modes = [], {}
+    with ExitStack() as stack:
+        for identity in sorted(handles):
+            stack.enter_context(handles[identity]._lock)
+        for value, spec in zip(arguments, parameter_specs, strict=True):
+            if spec["usage"] == "shared":
+                _representation(value, spec)
+                raw.append(value)
+                continue
+            if not isinstance(value, Owned):
+                raise OwnershipError("owned asynchronous argument requires a handle")
+            _live(value)
+            if value.type_id != spec["id"] or value.usage != spec["usage"]:
+                raise OwnershipError("asynchronous owner type or usage mismatch")
+            if spec["mode"] == "move" and value._borrows:
+                raise OwnershipError("cannot move a borrowed resource")
+            _representation(value._value, spec)
+            raw.append(value._value)
+            modes.setdefault(id(value), []).append(spec["mode"])
+        for usages in modes.values():
+            if "move" in usages and len(usages) != 1:
+                raise OwnershipError("aliased asynchronous move")
+        for identity, usages in modes.items():
+            handle = handles[identity]
+            if usages[0] == "move":
+                handle._valid = False
+                handle._value = None
+            else:
+                handle._borrows += 1
+                borrowed.append(handle)
+    borrowed_values = {id(value._value) for value in borrowed}
+    try:
+        pending = function(*raw)
+        if not inspect.isawaitable(pending):
+            raise OwnershipError("asynchronous operation did not return an awaitable")
+        values = _return_values(await pending, returns)
+        for value, spec in zip(values, returns, strict=True):
+            _representation(value, spec)
+            _check_result_aliases(value, borrowed_values, set())
+        for value, spec in zip(values, returns, strict=True):
+            if spec["usage"] != "shared" and sum(other is value for other in values) != 1:
+                raise OwnershipError("asynchronous results duplicate an owned resource")
+        return tuple(value if spec["usage"] == "shared" else Owned(value, spec["id"], spec["usage"]) for value, spec in zip(values, returns, strict=True))
+    finally:
+        for handle in borrowed:
+            with handle._lock:
+                _release_borrow(handle)
+
+
+class AsyncResourceScope(ResourceScope):
+    async def __aenter__(self):
+        return self.__enter__()
+
+    async def release(self, function, parameters):
+        import asyncio
+
+        async def cleanup():
+            await invoke_async(function, [self.handle], parameters, [])
+        pending = asyncio.create_task(cleanup())
+        cancelled = False
+        while not pending.done():
+            try:
+                await asyncio.shield(pending)
+            except asyncio.CancelledError:
+                cancelled = True
+        pending.result()
+        if cancelled:
+            raise asyncio.CancelledError
+
+    async def complete(self):
+        if not self.closed:
+            self.closed = True
+            await self.release(self.success, self.success_parameters)
+
+    async def __aexit__(self, exception_type, exception, traceback):
+        if not self.closed:
+            if exception_type is None:
+                await self.complete()
+            else:
+                self.closed = True
+                await self.release(self.failure, self.failure_parameters)
+        return False

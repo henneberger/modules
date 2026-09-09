@@ -484,6 +484,7 @@ class Functor:
     associated: Mapping[str, Any] = field(default_factory=dict)
     instance_sharing: tuple[tuple[str, str], ...] = ()
     instance_exports: Mapping[str, str] = field(default_factory=dict)
+    mixin: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         _text(self.name, "factory name")
@@ -527,6 +528,9 @@ class Functor:
                         f"shared type path {path!r} is not a declared dependency type"
                     )
             sharing.append(tuple(pair))
+        from .mixins import validate_mixin
+
+        validate_mixin({"requires": parameters, "associated": dict(self.associated), "instance_exports": dict(self.instance_exports), "mixin": self.mixin}, parameters, self.result)
         object.__setattr__(self, "parameters", MappingProxyType(parameters))
         object.__setattr__(self, "sharing", tuple(sharing))
         from .associated import validate_associated
@@ -562,6 +566,7 @@ class Functor:
             "associated": copy.deepcopy(self.associated),
             "instance_sharing": [list(pair) for pair in self.instance_sharing],
             "instance_exports": dict(self.instance_exports),
+            "mixin": copy.deepcopy(self.mixin),
         }
 
     def __call__(self, **bindings: ModuleView) -> ModuleView:
@@ -603,6 +608,12 @@ class Functor:
             )
         except ValueError as error:
             raise ContractError(str(error)) from error
+        if self.mixin is not None:
+            base = bindings[self.mixin["base"]].metadata()
+            if any(associated["types"].get(name) != term for name, term in base["associated"]["types"].items()):
+                raise ContractError("mixin changes an inherited abstract type")
+            if any(instances.get(name) != identity for name, identity in base["instances"].items()):
+                raise ContractError("mixin changes an inherited instance identity")
         identity_payload = {
             "factory": self.metadata(),
             "associated": associated,
@@ -620,6 +631,9 @@ class Functor:
             witnesses = exports.metadata()["associated"]["types"]
             if witnesses and witnesses != associated["types"]:
                 raise ContractError("factory result exposes incompatible abstract type witnesses")
+        from .mixins import apply_mixin
+
+        exports = apply_mixin(self.mixin, exports, bindings)
         scope = exports.instance_id if isinstance(exports, ModuleView) else uuid4().hex
         try:
             instances = resolve_instances(

@@ -277,6 +277,7 @@ def lower_graph(document, cards):
         equations={
             "associated": document.get("associated", {}),
             "constraints": document.get("constraints", {}),
+            "views": document.get("views", {}),
             "instance_exports": document.get("instance_exports", {}),
         },
     )

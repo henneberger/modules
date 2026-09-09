@@ -85,7 +85,7 @@ def read_program(source):
         raise TypeCheckError("ports must be a table")
     for name, port in ports.items():
         _name(name)
-        if name.startswith("_") or name == "discard":
+        if name.startswith("_") or name in {"discard", "resource"}:
             raise TypeCheckError(f"reserved module port name: {name}")
         _shape(port, {"requires"}, "typed port")
         validate_interface_reference(port.get("requires"))
@@ -131,6 +131,8 @@ class _Checker:
         self.types, self.effects = {}, set()
         self.imports = {}
         self.boundary = []
+        self.managed = {}
+        self.scopes = []
         for spec in interfaces:
             for value in _resolved_types(spec).values():
                 for primitive in ("str", "int", "float", "bool", "bytes"):
@@ -160,6 +162,7 @@ class _Checker:
                 "a checked program implements one operation and no Python type exports"
             )
         self.signature = self.result["typing"]["operations"][self.export]
+        self.asynchronous = self.result["callables"][self.export]["asynchronous"]
         self.parameters = []
         env = {}
         for param in self.result["callables"][self.export]["parameters"]:
@@ -200,7 +203,7 @@ class _Checker:
 
     def name(self, name, env, node):
         _name(name)
-        if name.startswith("_") or name in self.doc["ports"] or name == "discard":
+        if name.startswith("_") or name in self.doc["ports"] or name in {"discard", "resource"}:
             self.fail(node, f"reserved binding: {name}")
         if name in env:
             self.fail(node, f"binding {name!r} already exists; use a fresh name")
@@ -249,9 +252,16 @@ class _Checker:
         elif mode == "share":
             self.fail(node, "owned values require move or borrow mode")
         elif mode == "move":
+            if expression["name"] in self.managed:
+                self.fail(node, "managed resources may only be borrowed inside their scope")
             env[expression["name"]]["live"] = False
 
     def call(self, node, env):
+        awaited = isinstance(node, ast.Await)
+        if awaited:
+            if not self.asynchronous:
+                self.fail(node, "await requires an asynchronous public operation")
+            node = node.value
         if (
             not isinstance(node, ast.Call)
             or not isinstance(node.func, ast.Attribute)
@@ -262,6 +272,8 @@ class _Checker:
         port, export = node.func.value.id, node.func.attr
         spec = self.imports[port]
         operation = spec["typing"]["operations"].get(export)
+        if spec["callables"].get(export, {}).get("asynchronous", False) != awaited:
+            self.fail(node, "asynchronous operations require await; synchronous operations cannot be awaited")
         if operation is None:
             self.fail(node, f"unknown typed operation: {port}.{export}")
         if any(isinstance(arg, ast.Starred) for arg in node.args) or any(
@@ -313,6 +325,7 @@ class _Checker:
         )
         return {
             "kind": "call",
+            "asynchronous": awaited,
             "port": port,
             "export": export,
             "arguments": arguments,
@@ -320,6 +333,57 @@ class _Checker:
             "returns": returns,
             "line": node.lineno,
         }
+
+    def resource(self, node, env):
+        asynchronous = isinstance(node, ast.AsyncWith)
+        if asynchronous and not self.asynchronous:
+            self.fail(node, "async resource scope requires an asynchronous operation")
+        if len(node.items) != 1:
+            self.fail(node, "resource scopes bind one resource; nest scopes for additional resources")
+        item = node.items[0]
+        expression = item.context_expr
+        if not isinstance(expression, ast.Call) or not isinstance(expression.func, ast.Name) or expression.func.id != "resource" or len(expression.args) != 1:
+            self.fail(node, "resource scopes require resource(acquisition, success=port.operation, failure=port.operation)")
+        if not isinstance(item.optional_vars, ast.Name):
+            self.fail(node, "resource scope requires a fresh owner binding")
+        name = item.optional_vars.id
+        self.name(name, env, node)
+        policies = {value.arg: value.value for value in expression.keywords}
+        if set(policies) != {"success", "failure"} or len(expression.keywords) != 2:
+            self.fail(node, "resource scope requires exactly success and failure cleanup operations")
+        acquisition = expression.args[0]
+        if isinstance(acquisition, (ast.Call, ast.Await)):
+            acquire = self.call(acquisition, env)
+            if len(acquire["returns"]) != 1 or acquire["returns"][0]["usage"] == "shared":
+                self.fail(node, "resource acquisition must return one owned value")
+            value = acquire["returns"][0]
+        else:
+            source = self.value(acquisition, env)
+            value = self.types[source["type"]]
+            if value["usage"] == "shared":
+                self.fail(node, "resource scopes require owned values")
+            self.use(source, env, "move", node)
+            acquire = {"kind": "bind", "value": source}
+        env[name] = {"type": value["id"], "live": True}
+        cleanups = {}
+        for outcome, function in policies.items():
+            call = ast.Call(func=function, args=[ast.Name(id=name, ctx=ast.Load())], keywords=[])
+            ast.copy_location(call, node)
+            if asynchronous:
+                call = ast.copy_location(ast.Await(value=call), node)
+            cleanup = self.call(call, copy.deepcopy(env))
+            if cleanup["returns"] or len(cleanup["parameters"]) != 1 or cleanup["parameters"][0]["mode"] != "move":
+                self.fail(node, "cleanup must consume the resource and return no values")
+            cleanups[outcome] = cleanup
+        scope = {"name": "_resource_" + str(node.lineno), "asynchronous": asynchronous}
+        self.managed[name] = scope
+        self.scopes.append(scope)
+        try:
+            body = self.block(node.body, env)
+        finally:
+            self.scopes.pop()
+            del self.managed[name]
+        return {"kind": "resource", "owner": name, "scope": scope, "acquire": acquire, "success": cleanups["success"], "failure": cleanups["failure"], "body": body}
 
     def finish(self, node, env):
         values = (
@@ -351,17 +415,22 @@ class _Checker:
         outstanding = sorted(
             name
             for name, value in env.items()
-            if value["live"] and self.types[value["type"]]["usage"] == "linear"
+            if value["live"] and self.types[value["type"]]["usage"] == "linear" and name not in self.managed
         )
         if outstanding:
             self.fail(
                 node, f"unconsumed linear resources on normal return: {outstanding}"
             )
-        return {"kind": "return", "values": expressions}
+        return {"kind": "return", "values": expressions, "finalize": list(reversed(self.scopes))}
 
     def block(self, statements, env):
         result = []
         for position, node in enumerate(statements):
+            if isinstance(node, (ast.With, ast.AsyncWith)):
+                if position != len(statements) - 1:
+                    self.fail(node, "resource scopes must contain the continuation and its return")
+                result.append(self.resource(node, env))
+                return result
             if isinstance(node, ast.Return):
                 if position != len(statements) - 1:
                     self.fail(node, "unreachable statements after return")
@@ -414,7 +483,7 @@ class _Checker:
                         self.fail(target, "assignment targets must be fresh names")
                     self.name(target.id, {**env, **dict.fromkeys(names)}, target)
                     names.append(target.id)
-                if isinstance(node.value, ast.Call):
+                if isinstance(node.value, (ast.Call, ast.Await)):
                     call = self.call(node.value, env)
                     if len(names) != len(call["returns"]):
                         self.fail(
@@ -508,6 +577,7 @@ def check_program(source, repository):
         "returns": checker.returns,
         "types": checker.types,
         "effects": sorted(checker.effects),
+        "asynchronous": checker.asynchronous,
         "unit": unit,
         "trusted_operations": checker.boundary,
         "guarantees": {
@@ -517,6 +587,8 @@ def check_program(source, repository):
             "declared_effect_bound": True,
             "python_implementation_verified": False,
             "exception_cleanup_verified": False,
+            "structured_scope_cleanup": True,
+            "async_scope_cancellation_cleanup": checker.asynchronous,
         },
     }
     report["sha256"] = hashlib.sha256(canonical_bytes(report)).hexdigest()
@@ -543,6 +615,7 @@ def _python(report):
     lines = [
         "from module_families.ownership import invoke as _invoke, move_owned as _move, drop_owned as _drop, mark_checked as _checked",
         "from module_families.contracts import Requirement as _Requirement",
+        "from module_families.ownership import ResourceScope as _ResourceScope, AsyncResourceScope as _AsyncResourceScope, invoke_async as _invoke_async",
         "from module_families.typed_associated import specialize_runtime as _specialize, descriptors as _descriptors",
         "from module_families.interfaces import signature_from_spec as _signature",
         "from module_families.instance_terms import resolve_instances as _instances",
@@ -569,7 +642,7 @@ def _python(report):
         .callables[export]
         .signature
     )
-    lines.append(f"    def _entry{shape}:")
+    lines.append(f"    {'async ' if report['asynchronous'] else ''}def _entry{shape}:")
     if params:
         arguments = ", ".join(p["name"] for p in params)
         returns = [
@@ -592,6 +665,11 @@ def _python(report):
             return repr(bytes.fromhex(expr["literal"]))
         return repr(expr["literal"])
 
+    def call_source(statement):
+        args = ", ".join(value(v) for v in statement["arguments"])
+        invoke = "await _invoke_async" if statement.get("asynchronous") else "_invoke"
+        return f"{invoke}({statement['port']}[{statement['export']!r}], [{args}], _d({statement['parameters']!r}), _d({statement['returns']!r}))"
+
     def emit(statements, indent):
         for statement in statements:
             kind = statement["kind"]
@@ -601,12 +679,7 @@ def _python(report):
                     if statement["targets"]
                     else ""
                 )
-                args = ", ".join(value(v) for v in statement["arguments"])
-                lines.append(
-                    indent
-                    + prefix
-                    + f"_invoke({statement['port']}[{statement['export']!r}], [{args}], _d({statement['parameters']!r}), _d({statement['returns']!r}))"
-                )
+                lines.append(indent + prefix + call_source(statement))
             elif kind == "bind":
                 lines.append(
                     indent
@@ -614,7 +687,21 @@ def _python(report):
                 )
             elif kind == "discard":
                 lines.append(indent + f"_drop({value(statement['value'])})")
+            elif kind == "resource":
+                acquire = statement["acquire"]
+                if acquire["kind"] == "call":
+                    lines.append(indent + statement["owner"] + ", = " + call_source(acquire))
+                else:
+                    lines.append(indent + statement["owner"] + " = " + value(acquire["value"], True))
+                scope = statement["scope"]
+                success, failure = statement["success"], statement["failure"]
+                cls = "_AsyncResourceScope" if scope["asynchronous"] else "_ResourceScope"
+                lines.append(indent + f"{scope['name']} = {cls}({statement['owner']}, {success['port']}[{success['export']!r}], {failure['port']}[{failure['export']!r}], _d({success['parameters']!r}), _d({failure['parameters']!r}))")
+                lines.append(indent + ("async with " if scope["asynchronous"] else "with ") + scope["name"] + ":")
+                emit(statement["body"], indent + "    ")
             elif kind == "return":
+                for scope in statement.get("finalize", []):
+                    lines.append(indent + ("await " if scope["asynchronous"] else "") + scope["name"] + ".complete()")
                 values = [value(v, True) for v in statement["values"]]
                 lines.append(
                     indent + ("return " + ", ".join(values) if values else "return")

@@ -46,15 +46,43 @@ def prepare_graph(spec, raw, ports, type_scope=None):
     resolve_metadata({"requires": doc["ports"], "associated": spec.get("associated", {})}, witnesses, scope=type_scope)
     for alias in spec["order"]:
         card = spec["cards"][alias]
-        witnesses[alias] = resolve_metadata(card, {
-            slot: witnesses[doc["links"][alias + "." + slot]] for slot in card.get("requires", {})
-        }, scope=[*type_scope, alias, constructor_identity(card)])
+        supplied = {}
+        for slot, required in card.get("requires", {}).items():
+            edge = alias + "." + slot
+            child = witnesses[doc["links"][edge]]
+            if edge in doc.get("views", {}):
+                renames = doc["views"][edge].get("associated", {})
+                kinds = declarations[(required["id"], required["version"])].get("associated", {}).get("types", {})
+                child = {**child, "types": {name: child["types"][renames.get(name, name)] for name in kinds}}
+                for name, term in doc["views"][edge].get("where", {}).items():
+                    from .type_terms import normalize_term
+
+                    constructors = {**child["constructors"], **declarations[(required["id"], required["version"])].get("associated", {}).get("constructors", {})}
+                    if child["types"][name] != normalize_term(term, constructors):
+                        raise ModuleLinkError(f"associated type refinement failed: {edge}.{name}")
+            supplied[slot] = child
+        witnesses[alias] = resolve_metadata(card, supplied, scope=[*type_scope, alias, constructor_identity(card)])
         ref = card["provides"]
         validate_against_interface({"associated": witnesses[alias]}, declarations[(ref["id"], ref["version"])])
     prepared = {}
 
-    def factory_invoker(functor, card):
+    def project_arguments(alias, card, arguments):
+        from .refinement import project_module
+
+        projected = dict(arguments)
+        for slot in card.get("requires", {}):
+            edge = alias + "." + slot
+            if edge not in doc.get("views", {}):
+                continue
+            provider = doc["links"][edge]
+            source_ref = doc["ports"][provider]["requires"] if provider in doc["ports"] else spec["cards"][provider]["provides"]
+            target_ref = card["requires"][slot]
+            projected[slot] = project_module(arguments[slot], declarations[(source_ref["id"], source_ref["version"])], declarations[(target_ref["id"], target_ref["version"])], doc["views"][edge])
+        return projected
+
+    def factory_invoker(functor, card, alias):
         def instantiate(arguments, scope):
+            arguments = project_arguments(alias, card, arguments)
             indices = resolve_indices(
                 card,
                 {
@@ -106,9 +134,10 @@ def prepare_graph(spec, raw, ports, type_scope=None):
                 associated=card.get("associated", {}),
                 instance_sharing=card.get("instance_sharing", ()),
                 instance_exports=card.get("instance_exports", {}),
+                mixin=card.get("mixin"),
             )
 
-            invoke = factory_invoker(functor, card)
+            invoke = factory_invoker(functor, card, alias)
         else:
             if card.get("kind") == "module":
                 exports = raw[alias]

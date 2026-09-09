@@ -133,6 +133,7 @@ def link_expression(
                 associated=card.get("associated", {}),
                 instance_sharing=card.get("instance_sharing", ()),
                 instance_exports=card.get("instance_exports", {}),
+                mixin=card.get("mixin"),
             )
         elif card.get("kind") == "module":
             if not isinstance(loaded[alias], Mapping):

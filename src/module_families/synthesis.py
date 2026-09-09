@@ -178,13 +178,6 @@ def synthesize(
     evidence_store=None,
     trust_keys=None,
 ) -> dict:
-    """Search bounded constructor applications without imports or downloads.
-
-    Depth counts expression nodes on a path. One constructor artifact may
-    occur at most once per path; siblings may reuse it and initialize separate
-    instances at runtime. States count candidate expansions and constructed
-    applications. Completeness concerns this finite grammar, not all programs.
-    """
     if type(max_depth) is not int or not 1 <= max_depth <= 64:
         raise SynthesisError("max_depth must be an integer from 1 to 64")
     if any(
@@ -199,7 +192,7 @@ def synthesize(
         "max_states": max_states,
         "max_solutions": max_solutions,
         "max_candidates": max_candidates,
-        "constructor_repetition": "forbidden-on-path",
+        "constructor_repetition": "bounded-by-depth",
     }
     domains, interfaces, costs = {}, {}, {}
     rejections, seen_rejections = [], set()
@@ -266,69 +259,100 @@ def synthesize(
             reject({"code": "no-provider", "requires": reference})
         return values
 
-    def expand(reference, depth, active):
-        if depth == 1 and "root" in document["goal"]:
+    def expand(reference, depth):
+        pinned = None
+        if "root" in document["goal"]:
             selected = document["goal"]["root"]
             try:
-                card = repository.lock(
-                    selected["family"], selected["id"], version=selected["version"]
-                )["member"]
-                _cards({_alias(card): card})
-                _capabilities({_alias(card): card})
-                if _identity(card) != _identity(selected) or card["provides"] != reference:
-                    raise SynthesisError("pinned root identity or provided interface mismatch")
-                choices = [card]
+                pinned = repository.lock(selected["family"], selected["id"], version=selected["version"])["member"]
+                _cards({_alias(pinned): pinned})
+                if _identity(pinned) != _identity(selected) or pinned["provides"] != reference:
+                    raise SynthesisError("pinned root identity or interface mismatch")
             except (ValueError, KeyError, TypeError) as error:
                 reject({"code": "invalid-pinned-root", "error": str(error)})
-                choices = []
-        else:
-            choices = candidates(reference)
-        for card in choices:
-            tick()
-            alias, identity = _alias(card), _identity(card)
-            if not _is_open({"requires": {}, **card}):
-                yield {"use": alias}, {alias: card}
-                continue
-            if identity in active:
-                structural_cutoffs.add("constructor-repetition")
-                reject(
-                    {"code": "recursive-constructor-cutoff", "member": list(identity)}
-                )
-                continue
-            slots = sorted(card.get("requires", {}))
-            if slots and depth >= max_depth:
-                structural_cutoffs.add("max_depth")
-                reject(
-                    {"code": "depth-limit", "member": list(identity), "depth": depth}
-                )
-                continue
-            next_active = active | {identity}
+                return
 
-            def arguments(
-                position,
-                children,
-                chosen,
-                *,
-                slots=slots,
-                alias=alias,
-                card=card,
-                next_active=next_active,
-            ):
-                if position == len(slots):
-                    tick()
-                    yield {"use": alias, "with": children}, chosen
+        def closed(name, nodes, cards, visiting=None):
+            visiting = set() if visiting is None else visiting
+            if name in visiting:
+                return False
+            node = nodes[name]
+            if set(node.get("with", {})) != set(cards[node["use"]].get("requires", {})):
+                return False
+            return all(closed(child["ref"], nodes, cards, visiting | {name}) for child in node.get("with", {}).values())
+
+        def expression(nodes, root):
+            needed = set()
+            def visit(name):
+                if name in needed:
                     return
-                slot = slots[position]
-                for child, child_cards in expand(
-                    card["requires"][slot], depth + 1, next_active
-                ):
-                    yield from arguments(
-                        position + 1,
-                        {**children, slot: child},
-                        {**chosen, **child_cards},
-                    )
+                needed.add(name)
+                for child in nodes[name].get("with", {}).values():
+                    visit(child["ref"])
+            visit(root)
+            return {"let": {name: nodes[name] for name in sorted(needed)}, "in": {"ref": root}}
 
-            yield from arguments(0, {}, {alias: card})
+        validated = set()
+
+        def valid(nodes, cards):
+            for name in nodes:
+                if not closed(name, nodes, cards):
+                    continue
+                graph = expression(nodes, name)
+                identity = canonical_bytes({"expression": graph, "artifacts": {node["use"]: cards[node["use"]]["sha256"] for node in graph["let"].values()}})
+                if identity in validated:
+                    continue
+                result = _check(graph, cards, [], document.get("policy", {}).get("allowed_effects"))
+                if result["status"] != "unique":
+                    reject({"code": "partial-graph-conflict", "binding": name, "reasons": result.get("rejections", [])})
+                    return False
+                validated.add(identity)
+            return True
+
+        def branches(nodes, cards, pending, root):
+            parent, slot, required, level, ancestors = pending[0]
+            remaining = pending[1:]
+            if parent is not None:
+                for name, node in sorted(nodes.items()):
+                    if name in ancestors or cards[node["use"]]["provides"] != required or not closed(name, nodes, cards):
+                        continue
+                    tick()
+                    updated = copy.deepcopy(nodes)
+                    updated[parent]["with"][slot] = {"ref": name}
+                    if valid(updated, cards):
+                        yield updated, cards, remaining, root
+            choices = [pinned] if parent is None and pinned is not None else candidates(required)
+            for card in choices:
+                tick()
+                requirements = card.get("requires", {})
+                if requirements and level >= max_depth:
+                    structural_cutoffs.add("max_depth")
+                    reject({"code": "depth-limit", "member": list(_identity(card)), "depth": level})
+                    continue
+                alias = _alias(card)
+                chosen = {**cards, alias: card}
+                name = f"n{len(nodes)}"
+                updated = copy.deepcopy(nodes)
+                updated[name] = {"use": alias}
+                if _is_open({"requires": {}, **card}):
+                    updated[name]["with"] = {}
+                if parent is not None:
+                    updated[parent]["with"][slot] = {"ref": name}
+                children = [(name, port, requirement, level + 1, ancestors | {name}) for port, requirement in sorted(requirements.items())]
+                if valid(updated, chosen):
+                    yield updated, chosen, children + remaining, root or name
+
+        stack = [iter([({}, {}, [(None, None, reference, depth, set())], None)])]
+        while stack:
+            try:
+                nodes, cards, pending, root = next(stack[-1])
+            except StopIteration:
+                stack.pop()
+                continue
+            if not pending:
+                yield expression(nodes, root), cards
+            else:
+                stack.append(branches(nodes, cards, pending, root))
 
     def declarations(cards):
         selected = set()
@@ -346,6 +370,10 @@ def synthesize(
             validate_instance_interface(card, interfaces[(ref["id"], ref["version"])], {
                 slot: interfaces[(requirement["id"], requirement["version"])] for slot, requirement in card.get("requires", {}).items()
             })
+        from .mixins import validate_mixin_interfaces
+
+        for card in cards.values():
+            validate_mixin_interfaces(card, interfaces)
         return [interfaces[key] for key in sorted(selected)]
 
     def artifact_count(cards):
@@ -365,14 +393,7 @@ def synthesize(
 
     solutions, seen_solutions = [], set()
     try:
-        for expression, cards in expand(document["goal"]["requires"], 1, set()):
-            from .module_ir import ModuleIRError, satisfy_instance_sharing
-
-            try:
-                expression = satisfy_instance_sharing(expression, cards)
-            except ModuleIRError as error:
-                reject({"code": "instance-sharing-mismatch", "reason": str(error)})
-                continue
+        for expression, cards in expand(document["goal"]["requires"], 1):
             encoded = canonical_bytes(expression)
             if encoded in seen_solutions:
                 continue

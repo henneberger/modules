@@ -86,7 +86,14 @@ def graph_associated(doc, cards, order, interfaces):
         bindings = {}
         for slot in card.get("requires", {}):
             provider = doc["links"][alias + "." + slot]
-            bindings.update({slot + "." + name: term for name, term in values[provider].items()})
+            supplied = values[provider]
+            edge = alias + "." + slot
+            if edge in doc.get("views", {}):
+                renames = doc["views"][edge].get("associated", {})
+                supplied = {name: supplied[renames.get(name, name)] for name in spec(card["requires"][slot]).get("associated", {}).get("types", {})}
+                for name, term in doc["views"][edge].get("where", {}).items():
+                    equation(supplied[name], normalize_term(term, constructors), "signature refinement: " + edge + "." + name)
+            bindings.update({slot + "." + name: term for name, term in supplied.items()})
         scope = [alias, constructor_identity(card)]
         values[alias] = {name: elaborate(term, bindings, scope) for name, term in metadata.get("types", {}).items()}
         exported(card["provides"], values[alias], alias)
@@ -126,11 +133,10 @@ def graph_associated(doc, cards, order, interfaces):
             expected = target["typing"]["operations"][name]
             if not set(actual["effects"]) <= set(expected["effects"]):
                 raise ValueError(f"typed export effects exceed result contract: {name} <- {path}")
-            if set(actual["parameters"]) != set(expected["parameters"]) or len(actual["returns"]) != len(expected["returns"]):
+            if len(actual["parameters"]) != len(expected["parameters"]) or len(actual["returns"]) != len(expected["returns"]):
                 raise ValueError(f"typed export contract mismatch: {name} <- {path}")
             pairs = []
-            for parameter, requirement in expected["parameters"].items():
-                provided = actual["parameters"][parameter]
+            for (parameter, requirement), provided in zip(expected["parameters"].items(), actual["parameters"].values(), strict=True):
                 if provided["mode"] != requirement["mode"]:
                     raise ValueError(f"typed export contract mismatch: {name}.{parameter} ownership mode")
                 pairs.append((provided["type"], requirement["type"]))

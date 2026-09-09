@@ -116,6 +116,9 @@ def _cards(candidates: Any) -> dict[str, dict]:
                 raise PlanningError(f"{alias}: invalid type export {name!r}")
             _text(identity, f"{alias}.type_exports.{name}")
         card["type_exports"] = type_exports
+        from .mixins import validate_mixin
+
+        validate_mixin(card)
         validate_instances(card)
         validate_indices(card)
         validate_associated(card)
